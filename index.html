@@ -459,6 +459,42 @@
     return newItem;
   }
 
+  function findNextItemToSelect(itemId) {
+    const item = itemMap[itemId];
+    if (!item) return null;
+    
+    // If this item has a parent and is the only child, select the parent
+    if (item.parentId) {
+        const parent = itemMap[item.parentId];
+        if (parent && (!parent.children || parent.children.length <= 1)) {
+            return parent.id;
+        }
+    }
+    
+    const visible = buildVisibleList();
+    const currentIndex = visible.findIndex(t => t.id === itemId);
+    
+    if (currentIndex === -1) return null;
+    
+    // Try to select previous sibling
+    if (currentIndex > 0) {
+        return visible[currentIndex - 1].id;
+    }
+    
+    // If no previous sibling, try next sibling
+    if (currentIndex < visible.length - 1) {
+        return visible[currentIndex + 1].id;
+    }
+    
+    // If no siblings and has parent, select parent
+    if (item.parentId) {
+        return item.parentId;
+    }
+    
+    // If no parent (root level), return null
+    return null;
+  }
+
   function deleteItem(itemId) {
     const item = itemMap[itemId];
     if (!item) return;
@@ -467,55 +503,29 @@
     
     // Remove from parent or root
     if (item.parentId === null) {
-      items = items.filter(t => t.id !== itemId);
+        items = items.filter(t => t.id !== itemId);
     } else {
-      const p = itemMap[item.parentId];
-      if (p) {
-        p.children = p.children.filter(c => c.id !== itemId);
-        // If last child was removed, delete the children array
-        if (p.children.length === 0) {
-          delete p.children;
+        const p = itemMap[item.parentId];
+        if (p) {
+            p.children = p.children.filter(c => c.id !== itemId);
+            // If last child was removed, delete the children array
+            if (p.children.length === 0) {
+                delete p.children;
+            }
         }
-      }
     }
     
     removeFromMap(item);
+    
+    // Only update draft value if we're not selecting a new item
+    if (!nextSelectedId) {
+        updateDraftValue("");
+    }
+    
+    // Update selection before saving and rendering
     updateSelection(nextSelectedId);
-    updateDraftValue("");
     saveToLocalStorage();
-  }
-
-  function findNextItemToSelect(itemId) {
-    const item = itemMap[itemId];
-    if (!item) return null;
-    
-    const visible = buildVisibleList();
-    const currentIndex = visible.findIndex(t => t.id === itemId);
-    
-    if (currentIndex === -1) return null;
-    
-    // If this is the only child, select the parent
-    if (item.parentId && itemMap[item.parentId]?.children?.length === 1) {
-      return item.parentId;
-    }
-    
-    // Try to select previous sibling
-    if (currentIndex > 0) {
-      return visible[currentIndex - 1].id;
-    }
-    
-    // If no previous sibling, try next sibling
-    if (currentIndex < visible.length - 1) {
-      return visible[currentIndex + 1].id;
-    }
-    
-    // If no siblings, select parent
-    if (item.parentId) {
-      return item.parentId;
-    }
-    
-    // If no parent (root level), return null
-    return null;
+    renderAll();
   }
 
   function removeFromMap(item) {
@@ -965,9 +975,9 @@
     if (e.key === "Delete") {
         if (selectedItemId !== null && !draftValue.trim()) {
             deleteItem(selectedItemId);
-            selectedItemId = null;
-            draftValue = "";
-            renderAll();
+            // selectedItemId = null;
+            // draftValue = "";
+            // renderAll();
         }
     }
   });
