@@ -161,6 +161,53 @@
     #treeRoot:empty {
       margin-top: 0;
     }
+
+    /* Add these new styles */
+    .context-dialog {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      min-width: 300px;
+      max-width: 80vw;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .dialog-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+    }
+
+    .dialog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1em;
+    }
+
+    .close-button {
+      background: none;
+      border: none;
+      font-size: 1.5em;
+      cursor: pointer;
+      padding: 0.2em 0.5em;
+    }
+
+    .close-button:hover {
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -214,6 +261,9 @@
     draggingItemId: null,
     draftText: ""
   };
+
+  // Add currentProjectId to state
+  let currentProjectId = 'default';
 
   /**
    * Returns an array of all ancestor IDs (parent, grandparent, etc.)
@@ -306,7 +356,10 @@
       id: crypto.randomUUID(),
       text,
       modified: Date.now(),
-      type // 'actionable' or 'informational'
+      type,
+      tldr: '',        // Brief description
+      details: '',     // Detailed information
+      parentId
     };
     
     if (parentId) {
@@ -629,46 +682,6 @@
    *********************************************************************/
   const rootInputContainerEl = document.getElementById("rootInputContainer");
   const treeRootEl = document.getElementById("treeRoot");
-  function renderAll() {
-    rootInputContainerEl.innerHTML = "";
-    treeRootEl.innerHTML = "";
-
-    if (!tasks.length || selectedTaskId === null) {
-      renderRootInput();
-    }
-
-    tasks.forEach(t => {
-      renderTask(t, treeRootEl);
-    });
-  }
-
-  function renderRootInput() {
-    const inputEl = document.createElement("input");
-    inputEl.id = "singleInput";
-    inputEl.value = draftText;
-    inputEl.placeholder = "Digite para adicionar ao root...";
-    inputEl.onkeydown = handleSingleInputKeyDown;
-    inputEl.oninput = handleInputChange;
-    setTimeout(() => inputEl.focus(), 0);
-    rootInputContainerEl.appendChild(inputEl);
-
-    // Permitir drop no root
-    rootInputContainerEl.addEventListener("dragover", e => e.preventDefault());
-    rootInputContainerEl.addEventListener("dragenter", e => {
-      e.preventDefault();
-      rootInputContainerEl.classList.add("root-drop-target");
-    });
-    rootInputContainerEl.addEventListener("dragleave", e => {
-      rootInputContainerEl.classList.remove("root-drop-target");
-    });
-    rootInputContainerEl.addEventListener("drop", e => {
-      e.preventDefault();
-      rootInputContainerEl.classList.remove("root-drop-target");
-      if (draggingItemId) {
-        reparentTask(draggingItemId, null);
-      }
-    });
-  }
 
   function renderTask(task, containerEl) {
     const li = document.createElement("li");
@@ -677,16 +690,8 @@
     
     // DRAG & DROP 
     row.draggable = true;
-    
-    // dragstart => set global draggingItemId
-    row.addEventListener("dragstart", e => {
-      handleDragStart(e, task.id);
-    });
-
-    // dragend => clear global
-    row.addEventListener("dragend", e => {
-      handleDragEnd(e);
-    });
+    row.addEventListener("dragstart", e => handleDragStart(e, task.id));
+    row.addEventListener("dragend", e => handleDragEnd(e));
 
     // Move these event listeners to the li element instead of the row
     li.addEventListener("dragenter", e => {
@@ -698,14 +703,12 @@
 
     li.addEventListener("dragover", e => {
       e.preventDefault();
-      // Ensure hover state stays while dragging over
       if (draggingItemId && draggingItemId !== task.id && !isAncestorOrSelf(task.id, draggingItemId)) {
         row.classList.add("drag-hover");
       }
     });
 
     li.addEventListener("dragleave", e => {
-      // Only remove if we're actually leaving the li element
       if (!li.contains(e.relatedTarget)) {
         row.classList.remove("drag-hover");
       }
@@ -749,13 +752,23 @@
     // Label
     const labelSpan = document.createElement("span");
     labelSpan.textContent = task.text;
+    row.appendChild(labelSpan);
+    
+    // Add double-click handler to the row
+    row.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      e.preventDefault();
+      const projectId = HashProtocol.parse(window.location.hash)?.projectId || 'default';
+      window.location.hash = HashProtocol.create(projectId, task.id);
+    });
+    
+    // Make sure single click doesn't interfere with double click
     labelSpan.onclick = e => {
       e.stopPropagation();
       updateSelection(task.id);
       updateDraftText("");
       renderAll();
     };
-    row.appendChild(labelSpan);
 
     // Se for o item selecionado, exibir input
     if (selectedTaskId === task.id) {
@@ -793,6 +806,47 @@
     }
 
     containerEl.appendChild(li);
+  }
+
+  function renderAll() {
+    rootInputContainerEl.innerHTML = "";
+    treeRootEl.innerHTML = "";
+
+    if (!tasks.length || selectedTaskId === null) {
+      renderRootInput();
+    }
+
+    tasks.forEach(t => {
+      renderTask(t, treeRootEl);
+    });
+  }
+
+  function renderRootInput() {
+    const inputEl = document.createElement("input");
+    inputEl.id = "singleInput";
+    inputEl.value = draftText;
+    inputEl.placeholder = "Digite para adicionar ao root...";
+    inputEl.onkeydown = handleSingleInputKeyDown;
+    inputEl.oninput = handleInputChange;
+    setTimeout(() => inputEl.focus(), 0);
+    rootInputContainerEl.appendChild(inputEl);
+
+    // Permitir drop no root
+    rootInputContainerEl.addEventListener("dragover", e => e.preventDefault());
+    rootInputContainerEl.addEventListener("dragenter", e => {
+      e.preventDefault();
+      rootInputContainerEl.classList.add("root-drop-target");
+    });
+    rootInputContainerEl.addEventListener("dragleave", e => {
+      rootInputContainerEl.classList.remove("root-drop-target");
+    });
+    rootInputContainerEl.addEventListener("drop", e => {
+      e.preventDefault();
+      rootInputContainerEl.classList.remove("root-drop-target");
+      if (draggingItemId) {
+        reparentTask(draggingItemId, null);
+      }
+    });
   }
 
   function handleSingleInputKeyDown(e) {
@@ -896,12 +950,62 @@
   };
 
   /*********************************************************************
+   *                      HASH PROTOCOL HANDLER
+   *********************************************************************/
+  class HashProtocol {
+    static SEPARATOR = ':';
+    
+    // Parse hash into structured data
+    static parse(hash) {
+      if (!hash) {
+        // Empty hash means 'default' project
+        return {
+          projectId: 'default',
+          resourceId: null
+        };
+      }
+      
+      // Remove leading #
+      hash = hash.startsWith('#') ? hash.slice(1) : hash;
+      
+      // Split by separator
+      const [projectId, resourceId] = hash.split(HashProtocol.SEPARATOR);
+      
+      return {
+        projectId: projectId || 'default', // Empty projectId also means 'default'
+        resourceId // null if not present
+      };
+    }
+    
+    // Create hash string from parts
+    static create(projectId, resourceId = null) {
+      // Don't create hash for default project without resource
+      if (projectId === 'default' && !resourceId) {
+        return '';
+      }
+      
+      let hash = projectId;
+      if (resourceId) {
+        hash += HashProtocol.SEPARATOR + resourceId;
+      }
+      
+      return hash;
+    }
+  }
+
+  // Store the hash handler when initializing
+  let hashHandler;
+
+  /*********************************************************************
    *            INICIALIZAÇÃO
    *********************************************************************/
   async function init() {
-    await loadFromLocalStorage();
+    // Load initial data from localStorage
+    loadFromLocalStorage();
     loadMetaState();
     renderAll();
+    // Initialize hash handling after initial data is loaded
+    hashHandler = initHashPlaceHandling();
   }
 
   // Call init and handle any errors
@@ -1007,30 +1111,123 @@
     return 'seed';
   }
 
-  // Add URL hash handling
+  /*********************************************************************
+   *                      HASH PROTOCOL HANDLER
+   *********************************************************************/
   function initHashPlaceHandling() {
-    // Load initial state from hash
-    function loadFromHash() {
-      const hash = window.location.hash.slice(1); // Remove #
-      if (hash) {
-        // Here you would load the specific context based on the hash
-        // This could be a different localStorage key, or a different backend endpoint
-        loadContext(hash);
+    let lastProjectId = null;
+    let lastResourceId = null;
+
+    async function loadFromHash() {
+      const hash = window.location.hash.slice(1);
+      const context = HashProtocol.parse(hash);
+      
+      // If no context, use 'default' project
+      const projectId = context?.projectId || 'default';
+      
+      // Only reload project data if project ID changes
+      if (projectId !== lastProjectId) {
+        // First try to load from localStorage
+        const projectData = await DataSource.load(projectId);
+        if (projectData) {
+          tasks = projectData;
+        } else {
+          // If no data, use what's already in localStorage
+          loadFromLocalStorage();
+        }
+        
+        rebuildTaskMap(tasks);
+        currentProjectId = projectId;
+        lastProjectId = projectId;
+        renderAll();
+      }
+      
+      // Handle dialog visibility
+      if (context?.resourceId !== lastResourceId) {
+        if (context?.resourceId && taskMap[context.resourceId]) {
+          renderContextDialog(context.resourceId);
+        }
+        lastResourceId = context?.resourceId;
       }
     }
-    
-    // Update hash when context changes
-    function updateHash(contextId) {
-      window.location.hash = contextId;
-    }
-    
-    // Listen for hash changes
-    window.addEventListener('hashchange', loadFromHash);
+
+    // Handle hash changes
+    window.addEventListener('hashchange', (e) => {
+      loadFromHash();
+    }, false);
     
     // Initial load
     loadFromHash();
+  }
+
+  function renderContextDialog(taskId) {
+    const task = taskMap[taskId];
+    if (!task) return;
+
+    // Remove existing dialog if any
+    const existingDialog = document.querySelector('.dialog-backdrop');
+    if (existingDialog) {
+      existingDialog.remove();
+    }
+
+    // Create backdrop
+    const backdrop = document.createElement('div');
+    backdrop.className = 'dialog-backdrop';
+    backdrop.onclick = (e) => {
+      if (e.target === backdrop) {
+        backdrop.remove();
+        window.location.hash = currentProjectId;
+      }
+    };
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.className = 'context-dialog';
+
+    // Header with close button
+    const header = document.createElement('div');
+    header.className = 'dialog-header';
+    
+    const title = document.createElement('h2');
+    title.textContent = task.text;
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'close-button';
+    closeBtn.innerHTML = '×';
+    closeBtn.onclick = () => {
+      backdrop.remove();
+      window.location.hash = currentProjectId;
+    };
+
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    // Content
+    const content = document.createElement('div');
+    content.className = 'dialog-content';
+    
+    // Add task details
+    const details = document.createElement('div');
+    details.innerHTML = `
+      <p><strong>ID:</strong> ${task.id}</p>
+      <p><strong>Status:</strong> ${task.status || 'seed'}</p>
+      <p><strong>Modified:</strong> ${new Date(task.modified).toLocaleString()}</p>
+      ${task.parentId ? `<p><strong>Parent:</strong> ${taskMap[task.parentId]?.text || 'Unknown'}</p>` : ''}
+      ${task.children?.length ? `<p><strong>Children:</strong> ${task.children.length}</p>` : ''}
+    `;
+    
+    content.appendChild(details);
+
+    // Assemble dialog
+    dialog.appendChild(header);
+    dialog.appendChild(content);
+    backdrop.appendChild(dialog);
+    
+    // Add to document
+    document.body.appendChild(backdrop);
   }
 </script>
 
 </body>
 </html>
+
