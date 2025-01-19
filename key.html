@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Keyboard Animation</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: black;
+      overflow: hidden;
+      position: relative;
+    }
+
+    input {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      padding: 10px;
+      font-size: 18px;
+      text-align: center;
+      z-index: 1;
+      background: white;
+      border: none;
+      border-radius: 5px;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  </style>
+</head>
+<body>
+  <canvas></canvas>
+  <input type="text" id="output" readonly />
+  <script>
+    const canvas = document.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+    const input = document.getElementById("output");
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Layout do teclado
+    const keysLayout = {
+      row1: "`1234567890-=",
+      row2: "qwertyuiop[]\\",
+      row3: "asdfghjkl;'",
+      row4: "zxcvbnm,./"
+    };
+
+    const keyboardOrigin = { 
+      x: canvas.width / 2, 
+      y: canvas.height - 50  // Changed from -100 to -50
+    };
+    const keySpacing = 50;
+    const rowOffsets = [0, 30, 60, 90];
+    const letters = [];
+    const speed = 10;
+
+    // Determinar a posição de uma tecla
+    function getKeyPosition(key) {
+      for (let row = 0; row < 4; row++) {
+        const layoutRow = keysLayout[`row${row + 1}`];
+        const keyIndex = layoutRow.indexOf(key);
+        if (keyIndex !== -1) {
+          const x = keyboardOrigin.x + keySpacing * (keyIndex - layoutRow.length / 2);
+          const y = keyboardOrigin.y - rowOffsets[row]; // Changed to subtract offset
+          return { x, y };
+        }
+      }
+      return { x: keyboardOrigin.x, y: keyboardOrigin.y };
+    }
+
+    // Classe para representar uma letra animada
+    class Letter {
+      constructor(key, startX, startY, targetX, targetY) {
+        this.key = key;
+        this.x = startX;
+        this.y = startY;
+        this.z = 0; // Start at z=0
+        this.targetX = targetX;
+        this.targetY = targetY;
+        this.size = 20; // Start smaller
+        this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        this.alpha = 1;
+        // Add initial position at bottom
+        this.screenX = startX;
+        this.screenY = startY;
+      }
+
+      update() {
+        // Simplified movement directly from bottom to input
+        this.screenX += (this.targetX - this.screenX) * 0.1;
+        this.screenY += (this.targetY - this.screenY) * 0.1;
+        
+        // Calculate distance to target for scaling and fade
+        const dx = this.targetX - this.screenX;
+        const dy = this.targetY - this.screenY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Scale based on distance to target
+        this.size = 20 + (1 - Math.min(distance / 500, 1)) * 10;
+        
+        // Fade based on proximity to target
+        this.alpha = Math.max(0.5, 1 - (Math.min(distance / 500, 1)));
+      }
+
+      draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.font = `bold ${this.size}px Arial`;
+        ctx.fillText(this.key, this.screenX, this.screenY);
+        ctx.restore();
+      }
+
+      reachedTarget() {
+        const dx = this.targetX - this.screenX;
+        const dy = this.targetY - this.screenY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < 5; // Return true when very close to target
+      }
+    }
+
+    // Adiciona uma nova letra animada
+    function addLetter(key) {
+      const { x: startX, y: startY } = getKeyPosition(key);
+      const targetRect = input.getBoundingClientRect();
+      const targetX = targetRect.left + targetRect.width / 2;
+      const targetY = targetRect.top + targetRect.height / 2;
+      letters.push(new Letter(key, startX, startY, targetX, targetY));
+    }
+
+    // Função de animação
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = letters.length - 1; i >= 0; i--) {
+        const letter = letters[i];
+        letter.update();
+        letter.draw();
+
+        if (letter.reachedTarget()) {
+          input.value += letter.key;
+          letters.splice(i, 1);
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // Foco automático no campo de input
+    input.focus();
+
+    // Escuta eventos de pressionar teclas
+    window.addEventListener("keydown", (event) => {
+      const key = event.key;
+      if (key.length === 1) addLetter(key); // Ignora teclas especiais
+    });
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      keyboardOrigin.x = canvas.width / 2;
+      keyboardOrigin.y = canvas.height - 50;
+    });
+  </script>
+</body>
+</html>
