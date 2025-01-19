@@ -149,7 +149,7 @@
 </head>
 <body>
 
-<h1>Project Arbor - LocalStorage + Drag ID Global</h1>
+<h1>Project Arbor</h1>
 
 <button id="exportBtn">Export as JSON</button>
 <div id="rootInputContainer" class="root-input-area"></div>
@@ -519,26 +519,34 @@
     // dragend => clear global
     row.addEventListener("dragend", e => {
       draggingItemId = null;
+      // Clear any stuck hover states
+      document.querySelectorAll('.drag-hover').forEach(el => el.classList.remove('drag-hover'));
     });
 
-    // dragenter => highlight
-    row.addEventListener("dragenter", e => {
+    // Move these event listeners to the li element instead of the row
+    li.addEventListener("dragenter", e => {
       e.preventDefault();
       if (draggingItemId && draggingItemId !== task.id && !isAncestorOrSelf(task.id, draggingItemId)) {
         row.classList.add("drag-hover");
       }
     });
 
-    row.addEventListener("dragover", e => {
+    li.addEventListener("dragover", e => {
       e.preventDefault();
+      // Ensure hover state stays while dragging over
+      if (draggingItemId && draggingItemId !== task.id && !isAncestorOrSelf(task.id, draggingItemId)) {
+        row.classList.add("drag-hover");
+      }
     });
 
-    row.addEventListener("dragleave", e => {
-      row.classList.remove("drag-hover");
+    li.addEventListener("dragleave", e => {
+      // Only remove if we're actually leaving the li element
+      if (!li.contains(e.relatedTarget)) {
+        row.classList.remove("drag-hover");
+      }
     });
 
-    // drop => reparent
-    row.addEventListener("drop", e => {
+    li.addEventListener("drop", e => {
       e.preventDefault();
       e.stopPropagation();
       row.classList.remove("drag-hover");
