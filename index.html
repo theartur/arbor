@@ -409,6 +409,7 @@
     const t = createItem(value, null);
     items.push(t);
     saveToLocalStorage();
+    renderItem(t, treeRootEl); // Render only the new item
     return t;
   }
 
@@ -418,9 +419,8 @@
     
     const child = createItem(value, parentId);
     
-    // Create children array only when needed
     if (!parent.children) {
-      parent.children = [];
+        parent.children = [];
     }
     parent.children.push(child);
     
@@ -428,6 +428,7 @@
     delete parent.collapsed;
     
     saveToLocalStorage();
+    renderItemAndChildren(parentId); // Only render parent and its children
     return child;
   }
 
@@ -438,23 +439,31 @@
     const newItem = createItem(value, parentId);
 
     if (parentId === null) {
-      // Irmão top-level
-      const idx = items.indexOf(item);
-      if (idx < 0) {
-        items.push(newItem);
-      } else {
-        items.splice(idx + 1, 0, newItem);
-      }
+        // Top-level sibling
+        const idx = items.indexOf(item);
+        if (idx < 0) {
+            items.push(newItem);
+            renderItem(newItem, treeRootEl);
+        } else {
+            items.splice(idx + 1, 0, newItem);
+            // Re-render from the insertion point
+            const container = document.querySelector(`[data-item-id="${itemId}"]`).closest('li');
+            const newItemEl = document.createElement('li');
+            renderItem(newItem, newItemEl);
+            container.after(newItemEl);
+        }
     } else {
-      const parent = itemMap[parentId];
-      if (!parent) return null;
-      const idx = parent.children.indexOf(item);
-      if (idx < 0) {
-        parent.children.push(newItem);
-      } else {
-        parent.children.splice(idx + 1, 0, newItem);
-      }
+        const parent = itemMap[parentId];
+        if (!parent) return null;
+        const idx = parent.children.indexOf(item);
+        if (idx < 0) {
+            parent.children.push(newItem);
+        } else {
+            parent.children.splice(idx + 1, 0, newItem);
+        }
+        renderItemAndChildren(parentId); // Only render the parent and its children
     }
+    
     saveToLocalStorage();
     return newItem;
   }
@@ -849,12 +858,7 @@
     });
     
     // Make sure single click doesn't interfere with double click
-    labelSpan.onclick = e => {
-      e.stopPropagation();
-      updateSelection(item.id);
-      updateDraftValue("");
-      renderAll();
-    };
+    labelSpan.onclick = e => handleLabelClick(e, item.id);
 
     // Se for o item selecionado, exibir input
     if (selectedItemId === item.id) {
@@ -1139,36 +1143,39 @@
     const now = Date.now();
     
     function cleanItem(item) {
-      // Create new object with only necessary properties
-      const cleaned = {
-        id: item.id,
-        value: item.value,
-        modified: item.modified || now  // Ensure modified always exists
-      };
-      
-      // Only add parentId if not at root
-      if (item.parentId) {
-        cleaned.parentId = item.parentId;
-      }
-      
-      // Only add children if they exist and not empty
-      if (item.children?.length > 0) {
-        cleaned.children = item.children.map(cleanItem);
-        // Preserve collapsed state
-        if (item.collapsed) {
-          cleaned.collapsed = true;
+        const cleaned = {
+            id: item.id,
+            value: item.value,
+            modified: item.modified || now
+        };
+        
+        if (item.parentId) {
+            cleaned.parentId = item.parentId;
         }
-      }
-      
-      // Only add status if not 'seed'
-      if (item.status && item.status !== 'seed') {
-        cleaned.status = item.status;
-      }
-      
-      return cleaned;
+        
+        if (item.children?.length > 0) {
+            cleaned.children = item.children.map(cleanItem);
+            if (item.collapsed) {
+                cleaned.collapsed = true;
+            }
+        }
+        
+        if (item.status && item.status !== 'seed') {
+            cleaned.status = item.status;
+        }
+        
+        return cleaned;
     }
     
-    return items.map(cleanItem);
+    const cleanedItems = items.map(cleanItem);
+    // Only render if there were actual changes
+    if (JSON.stringify(items) !== JSON.stringify(cleanedItems)) {
+        items = cleanedItems;
+        rebuildItemMap(items);
+        saveToLocalStorage();
+        renderAll(); // This might still be needed for full cleanup
+    }
+    return cleanedItems;
   }
 
   // Update drag handlers to use meta state
@@ -1195,7 +1202,11 @@
             oldRow.classList.remove('selected');
             // Remove old input if exists
             const oldInput = oldRow.querySelector('#singleInput');
-            if (oldInput) oldInput.remove();
+            if (oldInput) {
+                // Save draft value before removing input
+                draftValue = oldInput.value;
+                oldInput.remove();
+            }
         }
         
         // Remove ancestor highlights
@@ -1218,7 +1229,7 @@
         if (newRow) {
             newRow.classList.add('selected');
             
-            // Add input field
+            // Add input field with current draft value
             const inputEl = document.createElement("input");
             inputEl.id = "singleInput";
             inputEl.value = draftValue;
@@ -1226,7 +1237,11 @@
             inputEl.oninput = handleInputChange;
             inputEl.onclick = e => e.stopPropagation();
             newRow.appendChild(inputEl);
-            setTimeout(() => inputEl.focus(), 0);
+            setTimeout(() => {
+                inputEl.focus();
+                // Position cursor at end of input
+                inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+            }, 0);
             
             // Highlight ancestors
             const newAncestors = getAncestorIds(itemId);
@@ -1240,6 +1255,9 @@
             // Ensure selected item is visible
             newRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
+    } else {
+        // Clear draft value when deselecting
+        draftValue = "";
     }
     
     saveMetaState();
@@ -1269,6 +1287,12 @@
     draftValue = value;
     metaState.draftValue = value;
     saveMetaState();
+    
+    // Update input if it exists
+    const input = document.querySelector('#singleInput');
+    if (input && input.value !== value) {
+        input.value = value;
+    }
   }
 
   // Update status handling to reflect child states
@@ -1505,11 +1529,7 @@
         window.location.hash = HashProtocol.create(projectId, item.id);
     });
     
-    labelSpan.onclick = e => {
-        e.stopPropagation();
-        updateSelection(item.id);
-        updateDraftValue('');
-    };
+    labelSpan.onclick = e => handleLabelClick(e, item.id);
     
     // Add input if selected
     if (selectedItemId === item.id) {
@@ -1534,6 +1554,13 @@
     
     // Replace old element with new one
     itemContainer.replaceWith(newLi);
+  }
+
+  // Update click handlers to properly manage draft value
+  function handleLabelClick(e, itemId) {
+    e.stopPropagation();
+    updateDraftValue(""); // Clear draft value when selecting new item
+    updateSelection(itemId);
   }
 </script>
 
