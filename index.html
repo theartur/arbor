@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Project Arbor - LocalStorage, Global Drag ID</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      user-select: none; 
+    }
+
+    h1 {
+      margin-bottom: 0.5em;
+    }
+
+    /* Região para adicionar tarefas no root (quando não há item selecionado ou lista vazia) */
+    .root-input-area {
+      margin-bottom: 1em;
+    }
+
+    ul {
+      list-style: none;
+      margin-left: 0;
+      padding-left: 20px; /* indent básico */
+    }
+
+    li {
+      margin: 0.25em 0;
+    }
+
+    /* Reset positioning */
+    .task-container {
+      position: relative;
+      padding-left: 24px; /* Space for status emoji */
+      line-height: 24px;
+    }
+
+    /* Status emoji */
+    .task-container::before {
+      content: "🌱";
+      position: absolute;
+      left: 2px;
+      cursor: pointer;
+    }
+
+    /* Expand button */
+    .expand-button {
+      position: absolute;
+      left: -20px; /* Adjust if needed to align properly */
+      top: 50%;
+      cursor: pointer;
+    }
+
+    /* Task row should be relative to allow proper stacking */
+    .task-row {
+      position: relative;
+      width: 100%;
+    }
+
+    /* Hover básico */
+    .task-container:hover {
+      background-color: #f8f8f8;
+    }
+
+    /* Selecção do item */
+    .task-container.selected {
+      outline: 2px solid #007BFF;
+      border-radius: 3px;
+    }
+
+    /* Destaque para ancestrais do selecionado */
+    .task-container.ancestor-of-selected {
+      background-color: #e3f2e3;
+      border-radius: 3px;
+      margin-left: -5px;
+    }
+
+    /* Destaque quando é um alvo de drop válido */
+    .task-container.drag-hover {
+      border: 2px dashed #007BFF;
+      background-color: #ccf2ff;
+    }
+
+    /* Botão de expandir/recolher com posicionamento absoluto do seu jeito */
+    .toggle-btn {
+      position: absolute;
+      margin-left: -37px;
+      font-size: 0.9em;
+      cursor: pointer;
+    }
+    .toggle-placeholder {
+      position: absolute;
+      margin-left: -5%;
+      width: 30px;
+    }
+
+    /* Input único de texto */
+    #singleInput {
+      border: 1px solid #888;
+      border-radius: 3px;
+      padding: 2px 4px;
+      font-size: 0.9em;
+      width: 150px;
+      margin-left: 8px;
+    }
+
+    #exportBtn {
+      margin-bottom: 1em;
+    }
+
+    /* Destaque quando solta no root */
+    .root-drop-target {
+      outline: 2px dashed #007BFF;
+      min-height: 20px;
+      margin: 10px 0;
+      background-color: #eef9ff;
+      transition: background-color 0.2s;
+    }
+
+    .task-container::before:hover {
+      background-color: #f0f0f0;
+    }
+
+    .task-container[data-status="blooming"]::before {
+      content: "🌸";
+    }
+
+    .task-container[data-status="needs-water"]::before {
+      content: "💧";
+    }
+
+    .task-container[data-status="under-sun"]::before {
+      content: "☀️";
+    }
+
+    .task-container[data-status="harvest"]::before {
+      content: "🌾";
+    }
+
+    .task-container[data-status="dormant"]::before {
+      content: "💤";
+    }
+
+    .task-container[data-status="pruned"]::before {
+      content: "✂️";
+    }
+  </style>
+</head>
+<body>
+
+<h1>Project Arbor - LocalStorage + Drag ID Global</h1>
+
+<button id="exportBtn">Export as JSON</button>
+<div id="rootInputContainer" class="root-input-area"></div>
+<ul id="treeRoot"></ul>
+
+<script>
+  /*********************************************************************
+   *                         ESTADO & VARIÁVEIS
+   *********************************************************************/
+  let tasks = [];          // Lista de tarefas no root
+  let taskMap = {};        // Mapa de ID -> objeto da tarefa
+  let selectedTaskId = null;
+  let draftText = "";
+  
+  const LS_KEY = "arbor_tasks";
+  
+  // Ao invés de usar dataTransfer para armazenar o ID,
+  // usaremos essa variável global para contornar problemas de browsers.
+  let draggingItemId = null; 
+
+  const STATUSES = ['seed', 'blooming', 'needs-water', 'under-sun', 'harvest', 'dormant', 'pruned'];
+
+  /**
+   * Returns an array of all ancestor IDs (parent, grandparent, etc.)
+   * for a given task ID, in order from immediate parent up.
+   */
+  function getAncestorIds(taskId) {
+    const result = [];
+    let current = taskMap[taskId];
+    while (current && current.parentId) {
+      result.push(current.parentId);
+      current = taskMap[current.parentId];
+    }
+    return result;
+  }
+
+  /*********************************************************************
+   *                      FUNÇÕES DE LOCALSTORAGE
+   *********************************************************************/
+  function saveToLocalStorage() {
+    const json = JSON.stringify(tasks);
+    localStorage.setItem(LS_KEY, json);
+  }
+
+  function loadFromLocalStorage() {
+    const stored = localStorage.getItem(LS_KEY);
+    if (!stored) {
+      tasks = [];
+      taskMap = {};
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        tasks = parsed;
+      } else {
+        tasks = [];
+      }
+    } catch {
+      tasks = [];
+    }
+    taskMap = {};
+    rebuildTaskMap(tasks);
+  }
+
+  function rebuildTaskMap(list) {
+    for (const t of list) {
+      taskMap[t.id] = t;
+      if (Array.isArray(t.children) && t.children.length > 0) {
+        rebuildTaskMap(t.children);
+      }
+    }
+  }
+
+  /*********************************************************************
+   *                      CRIAÇÃO & MODIFICAÇÃO
+   *********************************************************************/
+  function generateId() {
+    return crypto.randomUUID();
+  }
+
+  function createTask(text, parentId = null) {
+    const id = generateId();
+    const task = {
+      id,
+      text,
+      parentId,
+      children: [],
+      expanded: true,
+      status: 'seed', // Default status
+      created: Date.now(),
+      modified: Date.now()
+    };
+    taskMap[id] = task;
+    return task;
+  }
+
+  function addTopLevelTask(text) {
+    const t = createTask(text, null);
+    tasks.push(t);
+    saveToLocalStorage();
+    return t;
+  }
+
+  function addChildTask(parentId, text) {
+    const parent = taskMap[parentId];
+    if (!parent) return null;
+    const child = createTask(text, parentId);
+    parent.children.push(child);
+    parent.expanded = true;
+    saveToLocalStorage();
+    return child;
+  }
+
+  function addSiblingTask(taskId, text) {
+    const task = taskMap[taskId];
+    if (!task) return null;
+    const parentId = task.parentId;
+    const newTask = createTask(text, parentId);
+
+    if (parentId === null) {
+      // Irmão top-level
+      const idx = tasks.indexOf(task);
+      if (idx < 0) {
+        tasks.push(newTask);
+      } else {
+        tasks.splice(idx + 1, 0, newTask);
+      }
+    } else {
+      const parent = taskMap[parentId];
+      if (!parent) return null;
+      const idx = parent.children.indexOf(task);
+      if (idx < 0) {
+        parent.children.push(newTask);
+      } else {
+        parent.children.splice(idx + 1, 0, newTask);
+      }
+    }
+    saveToLocalStorage();
+    return newTask;
+  }
+
+  function deleteTask(taskId) {
+    const task = taskMap[taskId];
+    if (!task) return;
+    if (task.parentId === null) {
+      tasks = tasks.filter(t => t.id !== taskId);
+    } else {
+      const p = taskMap[task.parentId];
+      if (p) {
+        p.children = p.children.filter(c => c.id !== taskId);
+      }
+    }
+    removeFromMap(task);
+    saveToLocalStorage();
+  }
+
+  function removeFromMap(task) {
+    for (const child of task.children) {
+      removeFromMap(child);
+    }
+    delete taskMap[task.id];
+  }
+
+  function toggleTaskExpand(taskId) {
+    const t = taskMap[taskId];
+    if (!t) return;
+    t.expanded = !t.expanded;
+    selectedTaskId = taskId; // manter foco nele
+    saveToLocalStorage();
+  }
+
+  function cycleTaskStatus(taskId) {
+    const task = taskMap[taskId];
+    if (!task) return;
+    
+    const currentIdx = STATUSES.indexOf(task.status);
+    task.status = STATUSES[(currentIdx + 1) % STATUSES.length];
+    task.modified = Date.now();
+    saveToLocalStorage();
+  }
+
+  /*********************************************************************
+   *                    DRAG & DROP (VAR GLOBAL)
+   *********************************************************************/
+  function reparentTask(childId, newParentId) {
+    if (!taskMap[childId]) return;
+    // Evitar loops
+    if (newParentId !== null && isAncestorOrSelf(newParentId, childId)) return;
+
+    // Remover do antigo parent ou root
+    const child = taskMap[childId];
+    if (child.parentId === null) {
+      tasks = tasks.filter(t => t.id !== childId);
+    } else {
+      const oldParent = taskMap[child.parentId];
+      if (oldParent) {
+        oldParent.children = oldParent.children.filter(c => c.id !== childId);
+      }
+    }
+
+    // Inserir no novo parent ou root
+    if (newParentId === null) {
+      child.parentId = null;
+      tasks.push(child);
+    } else {
+      const newParent = taskMap[newParentId];
+      if (!newParent) {
+        // Se for inválido, não faz nada
+        return;
+      }
+      child.parentId = newParentId;
+      newParent.children.push(child);
+      newParent.expanded = true;
+    }
+    // Seleciona o item
+    selectedTaskId = childId;
+    saveToLocalStorage();
+    renderAll();
+  }
+
+  function isAncestorOrSelf(targetId, maybeChildId) {
+    if (targetId === maybeChildId) return true;
+    let c = taskMap[maybeChildId];
+    while (c && c.parentId) {
+      if (c.parentId === targetId) return true;
+      c = taskMap[c.parentId];
+    }
+    return false;
+  }
+
+  /*********************************************************************
+   *                      NAVEGAÇÃO
+   *********************************************************************/
+  function buildVisibleList() {
+    const out = [];
+    function dfs(arr) {
+      for (const t of arr) {
+        out.push(t);
+        if (t.expanded && t.children.length) {
+          dfs(t.children);
+        }
+      }
+    }
+    dfs(tasks);
+    return out;
+  }
+
+  function selectNextTask() {
+    const visible = buildVisibleList();
+    if (!visible.length) return;
+    if (selectedTaskId === null) {
+      selectedTaskId = visible[0].id;
+      return;
+    }
+    const idx = visible.findIndex(t => t.id === selectedTaskId);
+    if (idx < 0) {
+      selectedTaskId = visible[0].id;
+    } else if (idx < visible.length - 1) {
+      selectedTaskId = visible[idx + 1].id;
+    }
+  }
+
+  function selectPrevTask() {
+    const visible = buildVisibleList();
+    if (!visible.length) return;
+    if (selectedTaskId === null) {
+      selectedTaskId = visible[visible.length - 1].id;
+      return;
+    }
+    const idx = visible.findIndex(t => t.id === selectedTaskId);
+    if (idx < 0) {
+      selectedTaskId = visible[0].id;
+    } else if (idx === 0) {
+      selectedTaskId = null;
+    } else {
+      selectedTaskId = visible[idx - 1].id;
+    }
+  }
+
+  function selectFirstChild(taskId) {
+    if (taskId === null) return;
+    const t = taskMap[taskId];
+    if (!t) return;
+    if (!t.expanded) {
+      t.expanded = true;
+      saveToLocalStorage();
+    }
+    if (t.children.length) {
+      selectedTaskId = t.children[0].id;
+    }
+  }
+
+  function selectParentOrCollapse(taskId) {
+    if (taskId === null) return;
+    const t = taskMap[taskId];
+    if (!t) return;
+    if (t.expanded && t.children.length) {
+      t.expanded = false;
+      saveToLocalStorage();
+    } else if (t.parentId) {
+      selectedTaskId = t.parentId;
+    } else {
+      selectedTaskId = null;
+    }
+  }
+
+  /*********************************************************************
+   *                       RENDERIZAÇÃO
+   *********************************************************************/
+  const rootInputContainerEl = document.getElementById("rootInputContainer");
+  const treeRootEl = document.getElementById("treeRoot");
+  function renderAll() {
+    rootInputContainerEl.innerHTML = "";
+    treeRootEl.innerHTML = "";
+
+    if (!tasks.length || selectedTaskId === null) {
+      renderRootInput();
+    }
+
+    tasks.forEach(t => {
+      renderTask(t, treeRootEl);
+    });
+  }
+
+  function renderRootInput() {
+    const inputEl = document.createElement("input");
+    inputEl.id = "singleInput";
+    inputEl.value = draftText;
+    inputEl.placeholder = "Digite para adicionar ao root...";
+    inputEl.onkeydown = handleSingleInputKeyDown;
+    inputEl.oninput = e => { draftText = e.target.value; };
+    setTimeout(() => inputEl.focus(), 0);
+    rootInputContainerEl.appendChild(inputEl);
+
+    // Permitir drop no root
+    rootInputContainerEl.addEventListener("dragover", e => e.preventDefault());
+    rootInputContainerEl.addEventListener("dragenter", e => {
+      e.preventDefault();
+      rootInputContainerEl.classList.add("root-drop-target");
+    });
+    rootInputContainerEl.addEventListener("dragleave", e => {
+      rootInputContainerEl.classList.remove("root-drop-target");
+    });
+    rootInputContainerEl.addEventListener("drop", e => {
+      e.preventDefault();
+      rootInputContainerEl.classList.remove("root-drop-target");
+      if (draggingItemId) {
+        reparentTask(draggingItemId, null);
+      }
+    });
+  }
+
+  function renderTask(task, containerEl) {
+    const li = document.createElement("li");
+    const row = document.createElement("div");
+    row.className = "task-container";
+    
+    // DRAG & DROP 
+    row.draggable = true;
+    
+    // dragstart => set global draggingItemId
+    row.addEventListener("dragstart", e => {
+      draggingItemId = task.id;
+    });
+
+    // dragend => clear global
+    row.addEventListener("dragend", e => {
+      draggingItemId = null;
+    });
+
+    // dragenter => highlight
+    row.addEventListener("dragenter", e => {
+      e.preventDefault();
+      if (draggingItemId && draggingItemId !== task.id && !isAncestorOrSelf(task.id, draggingItemId)) {
+        row.classList.add("drag-hover");
+      }
+    });
+
+    row.addEventListener("dragover", e => {
+      e.preventDefault();
+    });
+
+    row.addEventListener("dragleave", e => {
+      row.classList.remove("drag-hover");
+    });
+
+    // drop => reparent
+    row.addEventListener("drop", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      row.classList.remove("drag-hover");
+      if (draggingItemId && draggingItemId !== task.id && !isAncestorOrSelf(task.id, draggingItemId)) {
+        reparentTask(draggingItemId, task.id);
+      }
+    });
+
+    // Seleção & ancestrais
+    if (selectedTaskId === task.id) {
+      row.classList.add("selected");
+    }
+    const ancestors = getAncestorIds(selectedTaskId);
+    if (ancestors.includes(task.id)) {
+      row.classList.add("ancestor-of-selected");
+    }
+
+    // Toggle ou placeholder
+    if (task.children && task.children.length > 0) {
+      const toggle = document.createElement("span");
+      toggle.className = "toggle-btn";
+      toggle.textContent = task.expanded ? "[-]" : "[+]";
+      toggle.onclick = e => {
+        e.stopPropagation();
+        toggleTaskExpand(task.id);
+        renderAll();
+      };
+      row.appendChild(toggle);
+    } else {
+      const placeholder = document.createElement("span");
+      placeholder.className = "toggle-placeholder";
+      row.appendChild(placeholder);
+    }
+
+    // Label
+    const labelSpan = document.createElement("span");
+    labelSpan.textContent = task.text;
+    labelSpan.onclick = e => {
+      e.stopPropagation();
+      selectedTaskId = task.id;
+      draftText = "";
+      renderAll();
+    };
+    row.appendChild(labelSpan);
+
+    // Se for o item selecionado, exibir input
+    if (selectedTaskId === task.id) {
+      const inputEl = document.createElement("input");
+      inputEl.id = "singleInput";
+      inputEl.value = draftText;
+      inputEl.onkeydown = handleSingleInputKeyDown;
+      inputEl.oninput = e => { draftText = e.target.value; };
+      inputEl.onclick = e => e.stopPropagation();
+      setTimeout(() => inputEl.focus(), 0);
+      row.appendChild(inputEl);
+    }
+
+    row.setAttribute('data-status', task.status || 'seed');
+    
+    // Add click handler directly to the row's ::before pseudo-element area
+    row.addEventListener('click', e => {
+      // Check if click was in the first 30px (emoji area)
+      if (e.offsetX < 30) {
+        e.stopPropagation();
+        cycleTaskStatus(task.id);
+        renderAll();
+      }
+    });
+
+    li.appendChild(row);
+
+    // Renderizar filhos se expandido
+    if (task.expanded && task.children && task.children.length) {
+      const childUl = document.createElement("ul");
+      task.children.forEach(c => renderTask(c, childUl));
+      li.appendChild(childUl);
+    }
+
+    containerEl.appendChild(li);
+  }
+
+  function handleSingleInputKeyDown(e) {
+    const text = draftText.trim();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!text) return;
+      if (selectedTaskId === null) {
+        const newTask = addTopLevelTask(text);
+        selectedTaskId = newTask.id;
+      } else {
+        const newTask = addChildTask(selectedTaskId, text);
+        if (newTask) {
+          selectedTaskId = newTask.id;
+        }
+      }
+      draftText = "";
+      renderAll();
+    }
+    else if (e.key === "Tab") {
+      e.preventDefault();
+      if (!text) return;
+      if (selectedTaskId === null) {
+        const newTask = addTopLevelTask(text);
+        selectedTaskId = newTask.id;
+      } else {
+        const newTask = addSiblingTask(selectedTaskId, text);
+        if (newTask) {
+          selectedTaskId = newTask.id;
+        }
+      }
+      draftText = "";
+      renderAll();
+    }
+    else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      selectNextTask();
+      renderAll();
+    }
+    else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      selectPrevTask();
+      renderAll();
+    }
+    else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      selectFirstChild(selectedTaskId);
+      renderAll();
+    }
+    else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      selectParentOrCollapse(selectedTaskId);
+      renderAll();
+    }
+  }
+
+  /*********************************************************************
+   *         TECLA DELETE => DELETAR ITEM SELECIONADO
+   *********************************************************************/
+  document.addEventListener("keydown", e => {
+    if (e.key === "Delete") {
+      if (selectedTaskId !== null) {
+        deleteTask(selectedTaskId);
+        selectedTaskId = null;
+        draftText = "";
+        renderAll();
+      }
+    }
+  });
+
+  /*********************************************************************
+   *         CLIQUE FORA => DESELECIONAR
+   *********************************************************************/
+  document.addEventListener("click", e => {
+    const isInsideTree = treeRootEl.contains(e.target);
+    const isInsideRoot = rootInputContainerEl.contains(e.target);
+    if (!isInsideTree && !isInsideRoot) {
+      selectedTaskId = null;
+      draftText = "";
+      renderAll();
+    }
+  });
+
+  /*********************************************************************
+   *        DROP NO BODY => RE-PARENT PARA ROOT
+   *********************************************************************/
+  document.addEventListener("dragover", e => e.preventDefault());
+  document.addEventListener("drop", e => {
+    e.preventDefault();
+    // Se não foi tratado por um filho, cairá aqui
+    if (draggingItemId) {
+      reparentTask(draggingItemId, null);
+    }
+  });
+
+  /*********************************************************************
+   *            EXPORTAR COMO JSON
+   *********************************************************************/
+  const exportBtn = document.getElementById("exportBtn");
+  exportBtn.onclick = () => {
+    const json = JSON.stringify(tasks, null, 2);
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(json);
+    const dlAnchor = document.createElement("a");
+    dlAnchor.setAttribute("href", dataStr);
+    dlAnchor.setAttribute("download", "tasks.json");
+    dlAnchor.click();
+  };
+
+  /*********************************************************************
+   *            INICIALIZAÇÃO
+   *********************************************************************/
+  loadFromLocalStorage();
+  renderAll();
+</script>
+
+</body>
+</html>
