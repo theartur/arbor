@@ -32,14 +32,14 @@
     }
 
     /* Reset positioning */
-    .task-container {
+    .item-container {
       position: relative;
       padding-left: 24px; /* Space for status emoji */
       line-height: 24px;
     }
 
     /* Status emoji */
-    .task-container::before {
+    .item-container::before {
       content: "🌱";
       position: absolute;
       left: 2px;
@@ -54,32 +54,32 @@
       cursor: pointer;
     }
 
-    /* Task row should be relative to allow proper stacking */
-    .task-row {
+    /* Item row should be relative to allow proper stacking */
+    .item-row {
       position: relative;
       width: 100%;
     }
 
     /* Hover básico */
-    .task-container:hover {
+    .item-container:hover {
       background-color: #f8f8f8;
     }
 
     /* Selecção do item */
-    .task-container.selected {
+    .item-container.selected {
       outline: 2px solid #007BFF;
       border-radius: 3px;
     }
 
     /* Destaque para ancestrais do selecionado */
-    .task-container.ancestor-of-selected {
+    .item-container.ancestor-of-selected {
       background-color: #e3f2e3;
       border-radius: 3px;
       margin-left: -5px;
     }
 
     /* Destaque quando é um alvo de drop válido */
-    .task-container.drag-hover {
+    .item-container.drag-hover {
       border: 2px dashed #007BFF;
       background-color: #ccf2ff;
     }
@@ -123,31 +123,31 @@
       transition: background-color 0.2s;
     }
 
-    .task-container::before:hover {
+    .item-container::before:hover {
       background-color: #f0f0f0;
     }
 
-    .task-container[data-status="blooming"]::before {
+    .item-container[data-status="blooming"]::before {
       content: "🌸";
     }
 
-    .task-container[data-status="needs-water"]::before {
+    .item-container[data-status="needs-water"]::before {
       content: "💧";
     }
 
-    .task-container[data-status="under-sun"]::before {
+    .item-container[data-status="under-sun"]::before {
       content: "☀️";
     }
 
-    .task-container[data-status="harvest"]::before {
+    .item-container[data-status="harvest"]::before {
       content: "🌾";
     }
 
-    .task-container[data-status="dormant"]::before {
+    .item-container[data-status="dormant"]::before {
       content: "💤";
     }
 
-    .task-container[data-status="pruned"]::before {
+    .item-container[data-status="pruned"]::before {
       content: "✂️";
     }
 
@@ -224,19 +224,19 @@
     }
 
     /* Mostra o handle quando hover sobre o container */
-    .task-container:hover .drag-handle {
+    .item-container:hover .drag-handle {
         visibility: visible;
     }
 
     /* Permite seleção de texto no label */
-    .task-label {
+    .item-label {
         user-select: text;
         cursor: text;
         flex: 1;
     }
 
-    /* Atualiza o task-container para usar flexbox */
-    .task-container {
+    /* Atualiza o item-container para usar flexbox */
+    .item-container {
         display: flex;
         align-items: center;
         padding-left: 24px;
@@ -271,12 +271,12 @@
     }
   };
 
-  let tasks = [];          // Lista de tarefas no root
-  let taskMap = {};        // Mapa de ID -> objeto da tarefa
-  let selectedTaskId = null;
+  let items = [];          // Lista de tarefas no root
+  let itemMap = {};        // Mapa de ID -> objeto da tarefa
+  let selectedItemId = null;
   let draftText = "";
   
-  const LS_KEY = "arbor_tasks";
+  const LS_KEY = "arbor_items";
   
   // Ao invés de usar dataTransfer para armazenar o ID,
   // usaremos essa variável global para contornar problemas de browsers.
@@ -292,7 +292,7 @@
 
   // Global meta state
   let metaState = {
-    selectedTaskId: null,
+    selectedItemId: null,
     draggingItemId: null,
     draftText: ""
   };
@@ -302,14 +302,14 @@
 
   /**
    * Returns an array of all ancestor IDs (parent, grandparent, etc.)
-   * for a given task ID, in order from immediate parent up.
+   * for a given item ID, in order from immediate parent up.
    */
-  function getAncestorIds(taskId) {
+  function getAncestorIds(itemId) {
     const result = [];
-    let current = taskMap[taskId];
+    let current = itemMap[itemId];
     while (current && current.parentId) {
       result.push(current.parentId);
-      current = taskMap[current.parentId];
+      current = itemMap[current.parentId];
     }
     return result;
   }
@@ -318,36 +318,36 @@
    *                      FUNÇÕES DE LOCALSTORAGE
    *********************************************************************/
   function saveToLocalStorage() {
-    const json = JSON.stringify(tasks);
+    const json = JSON.stringify(items);
     localStorage.setItem(LS_KEY, json);
   }
 
   function loadFromLocalStorage() {
     const stored = localStorage.getItem(LS_KEY);
     if (!stored) {
-      tasks = [];
-      taskMap = {};
+      items = [];
+      itemMap = {};
       return;
     }
     try {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) {
-        tasks = cleanupDataStructure(parsed);
+        items = cleanupDataStructure(parsed);
       } else {
-        tasks = [];
+        items = [];
       }
     } catch {
-      tasks = [];
+      items = [];
     }
-    taskMap = {};
-    rebuildTaskMap(tasks);
+    itemMap = {};
+    rebuildItemMap(items);
   }
 
-  function rebuildTaskMap(list) {
+  function rebuildItemMap(list) {
     for (const t of list) {
-      taskMap[t.id] = t;
+      itemMap[t.id] = t;
       if (Array.isArray(t.children) && t.children.length > 0) {
-        rebuildTaskMap(t.children);
+        rebuildItemMap(t.children);
       }
     }
   }
@@ -368,14 +368,14 @@
       };
       
       // Restore global variables from meta state
-      selectedTaskId = metaState.selectedTaskId;
+      selectedItemId = metaState.selectedItemId;
       draggingItemId = metaState.draggingItemId;
       draftText = metaState.draftText;
       
-      // Validate that selected task still exists
-      if (selectedTaskId && !taskMap[selectedTaskId]) {
-        selectedTaskId = null;
-        metaState.selectedTaskId = null;
+      // Validate that selected item still exists
+      if (selectedItemId && !itemMap[selectedItemId]) {
+        selectedItemId = null;
+        metaState.selectedItemId = null;
         saveMetaState();
       }
     } catch (e) {
@@ -386,8 +386,8 @@
   /*********************************************************************
    *                      CRIAÇÃO & MODIFICAÇÃO
    *********************************************************************/
-  function createTask(text, parentId = null, type = 'actionable') {
-    const task = {
+  function createItem(text, parentId = null, type = 'actionable') {
+    const item = {
       id: crypto.randomUUID(),
       text,
       modified: Date.now(),
@@ -398,25 +398,25 @@
     };
     
     if (parentId) {
-      task.parentId = parentId;
+      item.parentId = parentId;
     }
     
-    taskMap[task.id] = task;
-    return task;
+    itemMap[item.id] = item;
+    return item;
   }
 
-  function addTopLevelTask(text) {
-    const t = createTask(text, null);
-    tasks.push(t);
+  function addTopLevelItem(text) {
+    const t = createItem(text, null);
+    items.push(t);
     saveToLocalStorage();
     return t;
   }
 
-  function addChildTask(parentId, text) {
-    const parent = taskMap[parentId];
+  function addChildItem(parentId, text) {
+    const parent = itemMap[parentId];
     if (!parent) return null;
     
-    const child = createTask(text, parentId);
+    const child = createItem(text, parentId);
     
     // Create children array only when needed
     if (!parent.children) {
@@ -431,47 +431,47 @@
     return child;
   }
 
-  function addSiblingTask(taskId, text) {
-    const task = taskMap[taskId];
-    if (!task) return null;
-    const parentId = task.parentId;
-    const newTask = createTask(text, parentId);
+  function addSiblingItem(itemId, text) {
+    const item = itemMap[itemId];
+    if (!item) return null;
+    const parentId = item.parentId;
+    const newItem = createItem(text, parentId);
 
     if (parentId === null) {
       // Irmão top-level
-      const idx = tasks.indexOf(task);
+      const idx = items.indexOf(item);
       if (idx < 0) {
-        tasks.push(newTask);
+        items.push(newItem);
       } else {
-        tasks.splice(idx + 1, 0, newTask);
+        items.splice(idx + 1, 0, newItem);
       }
     } else {
-      const parent = taskMap[parentId];
+      const parent = itemMap[parentId];
       if (!parent) return null;
-      const idx = parent.children.indexOf(task);
+      const idx = parent.children.indexOf(item);
       if (idx < 0) {
-        parent.children.push(newTask);
+        parent.children.push(newItem);
       } else {
-        parent.children.splice(idx + 1, 0, newTask);
+        parent.children.splice(idx + 1, 0, newItem);
       }
     }
     saveToLocalStorage();
-    return newTask;
+    return newItem;
   }
 
-  function deleteTask(taskId) {
-    const task = taskMap[taskId];
-    if (!task) return;
+  function deleteItem(itemId) {
+    const item = itemMap[itemId];
+    if (!item) return;
 
-    const nextSelectedId = findNextTaskToSelect(taskId);
+    const nextSelectedId = findNextItemToSelect(itemId);
     
     // Remove from parent or root
-    if (task.parentId === null) {
-      tasks = tasks.filter(t => t.id !== taskId);
+    if (item.parentId === null) {
+      items = items.filter(t => t.id !== itemId);
     } else {
-      const p = taskMap[task.parentId];
+      const p = itemMap[item.parentId];
       if (p) {
-        p.children = p.children.filter(c => c.id !== taskId);
+        p.children = p.children.filter(c => c.id !== itemId);
         // If last child was removed, delete the children array
         if (p.children.length === 0) {
           delete p.children;
@@ -479,24 +479,24 @@
       }
     }
     
-    removeFromMap(task);
+    removeFromMap(item);
     updateSelection(nextSelectedId);
     updateDraftText("");
     saveToLocalStorage();
   }
 
-  function findNextTaskToSelect(taskId) {
-    const task = taskMap[taskId];
-    if (!task) return null;
+  function findNextItemToSelect(itemId) {
+    const item = itemMap[itemId];
+    if (!item) return null;
     
     const visible = buildVisibleList();
-    const currentIndex = visible.findIndex(t => t.id === taskId);
+    const currentIndex = visible.findIndex(t => t.id === itemId);
     
     if (currentIndex === -1) return null;
     
     // If this is the only child, select the parent
-    if (task.parentId && taskMap[task.parentId]?.children?.length === 1) {
-      return task.parentId;
+    if (item.parentId && itemMap[item.parentId]?.children?.length === 1) {
+      return item.parentId;
     }
     
     // Try to select previous sibling
@@ -510,26 +510,26 @@
     }
     
     // If no siblings, select parent
-    if (task.parentId) {
-      return task.parentId;
+    if (item.parentId) {
+      return item.parentId;
     }
     
     // If no parent (root level), return null
     return null;
   }
 
-  function removeFromMap(task) {
+  function removeFromMap(item) {
     // Só tenta remover filhos se eles existirem
-    if (task.children?.length) {
-        for (const child of task.children) {
+    if (item.children?.length) {
+        for (const child of item.children) {
             removeFromMap(child);
         }
     }
-    delete taskMap[task.id];
+    delete itemMap[item.id];
   }
 
-  function toggleTaskExpand(taskId) {
-    const t = taskMap[taskId];
+  function toggleItemExpand(itemId) {
+    const t = itemMap[itemId];
     if (!t || !t.children?.length) return;
     
     if (t.collapsed) {
@@ -538,43 +538,43 @@
       t.collapsed = true;
     }
     
-    updateSelection(taskId);
+    updateSelection(itemId);
     t.modified = Date.now(); // Update modification time when collapsing/expanding
     saveToLocalStorage();
   }
 
-  function cycleTaskStatus(taskId) {
-    const task = taskMap[taskId];
-    if (!task) return;
+  function cycleItemStatus(itemId) {
+    const item = itemMap[itemId];
+    if (!item) return;
     
-    const currentIdx = STATUSES.indexOf(task.status || 'seed');
+    const currentIdx = STATUSES.indexOf(item.status || 'seed');
     const newStatus = STATUSES[(currentIdx + 1) % STATUSES.length];
     
     // Only store non-default status
     if (newStatus === 'seed') {
-      delete task.status;
+      delete item.status;
     } else {
-      task.status = newStatus;
+      item.status = newStatus;
     }
     
-    task.modified = Date.now();
+    item.modified = Date.now();
     saveToLocalStorage();
   }
 
   /*********************************************************************
    *                    DRAG & DROP (VAR GLOBAL)
    *********************************************************************/
-  function reparentTask(childId, newParentId) {
-    if (!taskMap[childId]) return;
+  function reparentItem(childId, newParentId) {
+    if (!itemMap[childId]) return;
     // Evitar loops
     if (newParentId !== null && isAncestorOrSelf(newParentId, childId)) return;
 
     // Remover do antigo parent ou root
-    const child = taskMap[childId];
+    const child = itemMap[childId];
     if (child.parentId === null) {
-      tasks = tasks.filter(t => t.id !== childId);
+      items = items.filter(t => t.id !== childId);
     } else {
-      const oldParent = taskMap[child.parentId];
+      const oldParent = itemMap[child.parentId];
       if (oldParent) {
         oldParent.children = oldParent.children.filter(c => c.id !== childId);
         // If last child was removed, delete the children array
@@ -587,9 +587,9 @@
     // Inserir no novo parent ou root
     if (newParentId === null) {
       child.parentId = null;
-      tasks.push(child);
+      items.push(child);
     } else {
-      const newParent = taskMap[newParentId];
+      const newParent = itemMap[newParentId];
       if (!newParent) return; // Se for inválido, não faz nada
       
       child.parentId = newParentId;
@@ -610,10 +610,10 @@
 
   function isAncestorOrSelf(targetId, maybeChildId) {
     if (targetId === maybeChildId) return true;
-    let c = taskMap[maybeChildId];
+    let c = itemMap[maybeChildId];
     while (c && c.parentId) {
       if (c.parentId === targetId) return true;
-      c = taskMap[c.parentId];
+      c = itemMap[c.parentId];
     }
     return false;
   }
@@ -631,17 +631,17 @@
         }
       }
     }
-    dfs(tasks);
+    dfs(items);
     return out;
   }
 
-  function selectNextTask() {
+  function selectNextItem() {
     const visible = buildVisibleList();
     if (!visible.length) return;
-    if (selectedTaskId === null) {
+    if (selectedItemId === null) {
       updateSelection(visible[0].id);
     } else {
-      const idx = visible.findIndex(t => t.id === selectedTaskId);
+      const idx = visible.findIndex(t => t.id === selectedItemId);
       if (idx < 0) {
         updateSelection(visible[0].id);
       } else if (idx < visible.length - 1) {
@@ -651,13 +651,13 @@
     renderAll();
   }
 
-  function selectPrevTask() {
+  function selectPrevItem() {
     const visible = buildVisibleList();
     if (!visible.length) return;
-    if (selectedTaskId === null) {
+    if (selectedItemId === null) {
       updateSelection(visible[visible.length - 1].id);
     } else {
-      const idx = visible.findIndex(t => t.id === selectedTaskId);
+      const idx = visible.findIndex(t => t.id === selectedItemId);
       if (idx < 0) {
         updateSelection(visible[0].id);
       } else if (idx > 0) {
@@ -667,9 +667,9 @@
     renderAll();
   }
 
-  function selectFirstChild(taskId) {
-    if (taskId === null) return;
-    const t = taskMap[taskId];
+  function selectFirstChild(itemId) {
+    if (itemId === null) return;
+    const t = itemMap[itemId];
     if (!t || !t.children?.length) return;
     
     // If collapsed, expand first
@@ -683,9 +683,9 @@
     renderAll();
   }
 
-  function selectParentOrCollapse(taskId) {
-    if (taskId === null) return;
-    const t = taskMap[taskId];
+  function selectParentOrCollapse(itemId) {
+    if (itemId === null) return;
+    const t = itemMap[itemId];
     if (!t) return;
     
     // If current item is collapsed, move to parent
@@ -703,16 +703,16 @@
     renderAll();
   }
 
-  // Add function to move task directly under its grandparent
-  function moveToGrandparent(taskId) {
-    const task = taskMap[taskId];
-    if (!task || !task.parentId) return;
+  // Add function to move item directly under its grandparent
+  function moveToGrandparent(itemId) {
+    const item = itemMap[itemId];
+    if (!item || !item.parentId) return;
     
-    const parent = taskMap[task.parentId];
+    const parent = itemMap[item.parentId];
     if (!parent || !parent.parentId) return;
     
     const grandparentId = parent.parentId;
-    reparentTask(taskId, grandparentId);
+    reparentItem(itemId, grandparentId);
   }
 
   /*********************************************************************
@@ -721,10 +721,10 @@
   const rootInputContainerEl = document.getElementById("rootInputContainer");
   const treeRootEl = document.getElementById("treeRoot");
 
-  function renderTask(task, containerEl) {
+  function renderItem(item, containerEl) {
     const li = document.createElement("li");
     const row = document.createElement("div");
-    row.className = "task-container";
+    row.className = "item-container";
     
     // Adicionar handle para drag & drop
     const dragHandle = document.createElement("span");
@@ -733,7 +733,7 @@
     dragHandle.draggable = true;
     
     // Mover os eventos de drag para o handle
-    dragHandle.addEventListener("dragstart", e => handleDragStart(e, task.id));
+    dragHandle.addEventListener("dragstart", e => handleDragStart(e, item.id));
     dragHandle.addEventListener("dragend", e => handleDragEnd(e));
     
     // Remover draggable do row
@@ -742,14 +742,14 @@
     // Move these event listeners to the li element instead of the row
     li.addEventListener("dragenter", e => {
       e.preventDefault();
-      if (draggingItemId && draggingItemId !== task.id && !isAncestorOrSelf(task.id, draggingItemId)) {
+      if (draggingItemId && draggingItemId !== item.id && !isAncestorOrSelf(item.id, draggingItemId)) {
         row.classList.add("drag-hover");
       }
     });
 
     li.addEventListener("dragover", e => {
       e.preventDefault();
-      if (draggingItemId && draggingItemId !== task.id && !isAncestorOrSelf(task.id, draggingItemId)) {
+      if (draggingItemId && draggingItemId !== item.id && !isAncestorOrSelf(item.id, draggingItemId)) {
         row.classList.add("drag-hover");
       }
     });
@@ -764,28 +764,28 @@
       e.preventDefault();
       e.stopPropagation();
       row.classList.remove("drag-hover");
-      if (draggingItemId && draggingItemId !== task.id && !isAncestorOrSelf(task.id, draggingItemId)) {
-        reparentTask(draggingItemId, task.id);
+      if (draggingItemId && draggingItemId !== item.id && !isAncestorOrSelf(item.id, draggingItemId)) {
+        reparentItem(draggingItemId, item.id);
       }
     });
 
     // Seleção & ancestrais
-    if (selectedTaskId === task.id) {
+    if (selectedItemId === item.id) {
       row.classList.add("selected");
     }
-    const ancestors = getAncestorIds(selectedTaskId);
-    if (ancestors.includes(task.id)) {
+    const ancestors = getAncestorIds(selectedItemId);
+    if (ancestors.includes(item.id)) {
       row.classList.add("ancestor-of-selected");
     }
 
     // Toggle ou placeholder
-    if (task.children?.length) {
+    if (item.children?.length) {
       const toggle = document.createElement("span");
       toggle.className = "toggle-btn";
-      toggle.textContent = task.collapsed ? "[+]" : "[-]";
+      toggle.textContent = item.collapsed ? "[+]" : "[-]";
       toggle.onclick = e => {
         e.stopPropagation();
-        toggleTaskExpand(task.id);
+        toggleItemExpand(item.id);
         renderAll();
       };
       row.appendChild(toggle);
@@ -800,8 +800,8 @@
     
     // Label (agora selecionável)
     const labelSpan = document.createElement("span");
-    labelSpan.className = "task-label";
-    labelSpan.textContent = task.text;
+    labelSpan.className = "item-label";
+    labelSpan.textContent = item.text;
     row.appendChild(labelSpan);
     
     // Add double-click handler to the row
@@ -809,19 +809,19 @@
       e.stopPropagation();
       e.preventDefault();
       const projectId = HashProtocol.parse(window.location.hash)?.projectId || 'default';
-      window.location.hash = HashProtocol.create(projectId, task.id);
+      window.location.hash = HashProtocol.create(projectId, item.id);
     });
     
     // Make sure single click doesn't interfere with double click
     labelSpan.onclick = e => {
       e.stopPropagation();
-      updateSelection(task.id);
+      updateSelection(item.id);
       updateDraftText("");
       renderAll();
     };
 
     // Se for o item selecionado, exibir input
-    if (selectedTaskId === task.id) {
+    if (selectedItemId === item.id) {
       const inputEl = document.createElement("input");
       inputEl.id = "singleInput";
       inputEl.value = draftText;
@@ -832,15 +832,15 @@
       row.appendChild(inputEl);
     }
 
-    const effectiveStatus = getEffectiveStatus(task.id);
+    const effectiveStatus = getEffectiveStatus(item.id);
     row.setAttribute('data-status', effectiveStatus);
     
     // Only allow status cycling for leaf nodes
-    if (!task.children?.length && task.type === 'actionable') {
+    if (!item.children?.length && item.type === 'actionable') {
       row.addEventListener('click', e => {
         if (e.offsetX < 30) {
           e.stopPropagation();
-          cycleTaskStatus(task.id);
+          cycleItemStatus(item.id);
           renderAll();
         }
       });
@@ -849,9 +849,9 @@
     li.appendChild(row);
 
     // Renderizar filhos se expandido
-    if (!task.collapsed && task.children?.length) {
+    if (!item.collapsed && item.children?.length) {
       const childUl = document.createElement("ul");
-      task.children.forEach(c => renderTask(c, childUl));
+      item.children.forEach(c => renderItem(c, childUl));
       li.appendChild(childUl);
     }
 
@@ -862,12 +862,12 @@
     rootInputContainerEl.innerHTML = "";
     treeRootEl.innerHTML = "";
 
-    if (!tasks.length || selectedTaskId === null) {
+    if (!items.length || selectedItemId === null) {
       renderRootInput();
     }
 
-    tasks.forEach(t => {
-      renderTask(t, treeRootEl);
+    items.forEach(t => {
+      renderItem(t, treeRootEl);
     });
   }
 
@@ -894,7 +894,7 @@
       e.preventDefault();
       rootInputContainerEl.classList.remove("root-drop-target");
       if (draggingItemId) {
-        reparentTask(draggingItemId, null);
+        reparentItem(draggingItemId, null);
       }
     });
   }
@@ -906,24 +906,24 @@
             e.preventDefault();
             if (!draftText) return;
 
-            let newTask;
+            let newItem;
             if (e.key === "Enter") {
                 // Enter creates child
-                if (selectedTaskId === null) {
-                    newTask = addTopLevelTask(draftText);
+                if (selectedItemId === null) {
+                    newItem = addTopLevelItem(draftText);
                 } else {
-                    newTask = addChildTask(selectedTaskId, draftText);
+                    newItem = addChildItem(selectedItemId, draftText);
                 }
             } else { // Tab creates sibling
-                if (selectedTaskId === null) {
-                    newTask = addTopLevelTask(draftText);
+                if (selectedItemId === null) {
+                    newItem = addTopLevelItem(draftText);
                 } else {
-                    newTask = addSiblingTask(selectedTaskId, draftText);
+                    newItem = addSiblingItem(selectedItemId, draftText);
                 }
             }
 
-            if (newTask) {
-                updateSelection(newTask.id);
+            if (newItem) {
+                updateSelection(newItem.id);
             }
             updateDraftText("");
             renderAll();
@@ -934,23 +934,23 @@
     // Navigation keys
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      selectNextTask();
+      selectNextItem();
     }
     else if (e.key === "ArrowUp") {
       e.preventDefault();
-      selectPrevTask();
+      selectPrevItem();
     }
     else if (e.key === "ArrowRight") {
       e.preventDefault();
-      selectFirstChild(selectedTaskId);
+      selectFirstChild(selectedItemId);
     }
     else if (e.key === "ArrowLeft") {
       e.preventDefault();
-      selectParentOrCollapse(selectedTaskId);
+      selectParentOrCollapse(selectedItemId);
     }
     else if (e.key === "Backspace" && e.altKey) {
       e.preventDefault();
-      moveToGrandparent(selectedTaskId);
+      moveToGrandparent(selectedItemId);
     }
   }
 
@@ -963,9 +963,9 @@
    *********************************************************************/
   document.addEventListener("keydown", e => {
     if (e.key === "Delete") {
-        if (selectedTaskId !== null && !draftText.trim()) {
-            deleteTask(selectedTaskId);
-            selectedTaskId = null;
+        if (selectedItemId !== null && !draftText.trim()) {
+            deleteItem(selectedItemId);
+            selectedItemId = null;
             draftText = "";
             renderAll();
         }
@@ -993,7 +993,7 @@
     e.preventDefault();
     // Se não foi tratado por um filho, cairá aqui
     if (draggingItemId) {
-      reparentTask(draggingItemId, null);
+      reparentItem(draggingItemId, null);
     }
   });
 
@@ -1002,11 +1002,11 @@
    *********************************************************************/
   const exportBtn = document.getElementById("exportBtn");
   exportBtn.onclick = () => {
-    const json = JSON.stringify(tasks, null, 2);
+    const json = JSON.stringify(items, null, 2);
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(json);
     const dlAnchor = document.createElement("a");
     dlAnchor.setAttribute("href", dataStr);
-    dlAnchor.setAttribute("download", "tasks.json");
+    dlAnchor.setAttribute("download", "items.json");
     dlAnchor.click();
   };
 
@@ -1076,51 +1076,51 @@
 
   // Add this to help debug
   window.addEventListener('load', () => {
-    console.log('After load - selectedTaskId:', selectedTaskId);
+    console.log('After load - selectedItemId:', selectedItemId);
     console.log('localStorage selection:', localStorage.getItem(LS_SELECTION_KEY));
   });
 
   // Add this function to clean up the data structure
-  function cleanupDataStructure(tasks) {
+  function cleanupDataStructure(items) {
     const now = Date.now();
     
-    function cleanTask(task) {
+    function cleanItem(item) {
       // Create new object with only necessary properties
       const cleaned = {
-        id: task.id,
-        text: task.text,
-        modified: task.modified || now  // Ensure modified always exists
+        id: item.id,
+        text: item.text,
+        modified: item.modified || now  // Ensure modified always exists
       };
       
       // Only add parentId if not at root
-      if (task.parentId) {
-        cleaned.parentId = task.parentId;
+      if (item.parentId) {
+        cleaned.parentId = item.parentId;
       }
       
       // Only add children if they exist and not empty
-      if (task.children?.length > 0) {
-        cleaned.children = task.children.map(cleanTask);
+      if (item.children?.length > 0) {
+        cleaned.children = item.children.map(cleanItem);
         // Preserve collapsed state
-        if (task.collapsed) {
+        if (item.collapsed) {
           cleaned.collapsed = true;
         }
       }
       
       // Only add status if not 'seed'
-      if (task.status && task.status !== 'seed') {
-        cleaned.status = task.status;
+      if (item.status && item.status !== 'seed') {
+        cleaned.status = item.status;
       }
       
       return cleaned;
     }
     
-    return tasks.map(cleanTask);
+    return items.map(cleanItem);
   }
 
   // Update drag handlers to use meta state
-  function handleDragStart(e, taskId) {
-    metaState.draggingItemId = taskId;
-    draggingItemId = taskId;
+  function handleDragStart(e, itemId) {
+    metaState.draggingItemId = itemId;
+    draggingItemId = itemId;
     saveMetaState();
   }
 
@@ -1133,9 +1133,9 @@
   }
 
   // Update selection handlers
-  function updateSelection(taskId) {
-    selectedTaskId = taskId;
-    metaState.selectedTaskId = taskId;
+  function updateSelection(itemId) {
+    selectedItemId = itemId;
+    metaState.selectedItemId = itemId;
     saveMetaState();
   }
 
@@ -1147,17 +1147,17 @@
   }
 
   // Update status handling to reflect child states
-  function getEffectiveStatus(taskId) {
-    const task = taskMap[taskId];
-    if (!task) return 'seed';
+  function getEffectiveStatus(itemId) {
+    const item = itemMap[itemId];
+    if (!item) return 'seed';
     
     // If it has no children, use its own status
-    if (!task.children?.length) {
-      return task.status || 'seed';
+    if (!item.children?.length) {
+      return item.status || 'seed';
     }
     
     // Get all child statuses
-    const childStatuses = task.children.map(child => getEffectiveStatus(child.id));
+    const childStatuses = item.children.map(child => getEffectiveStatus(child.id));
     
     // Priority order (most critical first)
     const priorityOrder = ['needs-water', 'under-sun', 'blooming', 'harvest', 'dormant', 'pruned', 'seed'];
@@ -1193,8 +1193,8 @@
         if (projectId !== lastProjectId) {
             const projectData = await DataSource.load(projectId);
             if (projectData) {
-                tasks = projectData;
-                rebuildTaskMap(tasks);
+                items = projectData;
+                rebuildItemMap(items);
                 currentProjectId = projectId;
                 lastProjectId = projectId;
                 renderAll();
@@ -1208,7 +1208,7 @@
         
         // Handle dialog visibility
         if (context?.resourceId !== lastResourceId) {
-            if (context?.resourceId && taskMap[context.resourceId]) {
+            if (context?.resourceId && itemMap[context.resourceId]) {
                 renderContextDialog(context.resourceId);
             } else if (lastResourceId) {
                 closeDialog(false);
@@ -1242,9 +1242,9 @@
     }
   }
 
-  function renderContextDialog(taskId) {
-    const task = taskMap[taskId];
-    if (!task) return;
+  function renderContextDialog(itemId) {
+    const item = itemMap[itemId];
+    if (!item) return;
 
     // Remove existing dialog if any
     const existingDialog = document.querySelector('.dialog-backdrop');
@@ -1273,7 +1273,7 @@
     header.className = 'dialog-header';
     
     const title = document.createElement('h2');
-    title.textContent = task.text;
+    title.textContent = item.text;
     
     const closeBtn = document.createElement('button');
     closeBtn.className = 'close-button';
@@ -1287,14 +1287,14 @@
     const content = document.createElement('div');
     content.className = 'dialog-content';
     
-    // Add task details
+    // Add item details
     const details = document.createElement('div');
     details.innerHTML = `
-      <p><strong>ID:</strong> ${task.id}</p>
-      <p><strong>Status:</strong> ${task.status || 'seed'}</p>
-      <p><strong>Modified:</strong> ${new Date(task.modified).toLocaleString()}</p>
-      ${task.parentId ? `<p><strong>Parent:</strong> ${taskMap[task.parentId]?.text || 'Unknown'}</p>` : ''}
-      ${task.children?.length ? `<p><strong>Children:</strong> ${task.children.length}</p>` : ''}
+      <p><strong>ID:</strong> ${item.id}</p>
+      <p><strong>Status:</strong> ${item.status || 'seed'}</p>
+      <p><strong>Modified:</strong> ${new Date(item.modified).toLocaleString()}</p>
+      ${item.parentId ? `<p><strong>Parent:</strong> ${itemMap[item.parentId]?.text || 'Unknown'}</p>` : ''}
+      ${item.children?.length ? `<p><strong>Children:</strong> ${item.children.length}</p>` : ''}
     `;
     
     content.appendChild(details);
