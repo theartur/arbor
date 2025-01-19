@@ -210,6 +210,39 @@
       background: #f0f0f0;
       border-radius: 4px;
     }
+
+    /* Estilo para o handle de drag & drop */
+    .drag-handle {
+        cursor: move;
+        padding: 0 8px;
+        color: #999;
+        font-size: 14px;
+        user-select: none;
+        display: inline-block;
+        vertical-align: middle;
+        visibility: hidden;  /* Esconde por padrão */
+    }
+
+    /* Mostra o handle quando hover sobre o container */
+    .task-container:hover .drag-handle {
+        visibility: visible;
+    }
+
+    /* Permite seleção de texto no label */
+    .task-label {
+        user-select: text;
+        cursor: text;
+        flex: 1;
+    }
+
+    /* Atualiza o task-container para usar flexbox */
+    .task-container {
+        display: flex;
+        align-items: center;
+        padding-left: 24px;
+        line-height: 24px;
+        user-select: text;
+    }
   </style>
 </head>
 <body>
@@ -486,8 +519,11 @@
   }
 
   function removeFromMap(task) {
-    for (const child of task.children) {
-      removeFromMap(child);
+    // Só tenta remover filhos se eles existirem
+    if (task.children?.length) {
+        for (const child of task.children) {
+            removeFromMap(child);
+        }
     }
     delete taskMap[task.id];
   }
@@ -690,10 +726,18 @@
     const row = document.createElement("div");
     row.className = "task-container";
     
-    // DRAG & DROP 
-    row.draggable = true;
-    row.addEventListener("dragstart", e => handleDragStart(e, task.id));
-    row.addEventListener("dragend", e => handleDragEnd(e));
+    // Adicionar handle para drag & drop
+    const dragHandle = document.createElement("span");
+    dragHandle.className = "drag-handle";
+    dragHandle.textContent = "⋮⋮"; // Ícone de "arraste aqui"
+    dragHandle.draggable = true;
+    
+    // Mover os eventos de drag para o handle
+    dragHandle.addEventListener("dragstart", e => handleDragStart(e, task.id));
+    dragHandle.addEventListener("dragend", e => handleDragEnd(e));
+    
+    // Remover draggable do row
+    row.draggable = false;
 
     // Move these event listeners to the li element instead of the row
     li.addEventListener("dragenter", e => {
@@ -751,8 +795,12 @@
       row.appendChild(placeholder);
     }
 
-    // Label
+    // Adicionar o handle antes do texto
+    row.appendChild(dragHandle);
+    
+    // Label (agora selecionável)
     const labelSpan = document.createElement("span");
+    labelSpan.className = "task-label";
     labelSpan.textContent = task.text;
     row.appendChild(labelSpan);
     
@@ -854,22 +902,33 @@
   function handleSingleInputKeyDown(e) {
     // If there's text in the input, only allow text navigation
     if (draftText.trim()) {
-      if (e.key === "Enter" || e.key === "Tab") {
-        e.preventDefault();
-        if (!draftText) return;
-        if (selectedTaskId === null) {
-          const newTask = addTopLevelTask(draftText);
-          updateSelection(newTask.id);
-        } else {
-          const newTask = addChildTask(selectedTaskId, draftText);
-          if (newTask) {
-            updateSelection(newTask.id);
-          }
+        if (e.key === "Enter" || e.key === "Tab") {
+            e.preventDefault();
+            if (!draftText) return;
+
+            let newTask;
+            if (e.key === "Enter") {
+                // Enter creates child
+                if (selectedTaskId === null) {
+                    newTask = addTopLevelTask(draftText);
+                } else {
+                    newTask = addChildTask(selectedTaskId, draftText);
+                }
+            } else { // Tab creates sibling
+                if (selectedTaskId === null) {
+                    newTask = addTopLevelTask(draftText);
+                } else {
+                    newTask = addSiblingTask(selectedTaskId, draftText);
+                }
+            }
+
+            if (newTask) {
+                updateSelection(newTask.id);
+            }
+            updateDraftText("");
+            renderAll();
         }
-        updateDraftText("");
-        renderAll();
-      }
-      return; // Block other navigation when editing
+        return; // Block other navigation when editing
     }
 
     // Navigation keys
@@ -904,12 +963,12 @@
    *********************************************************************/
   document.addEventListener("keydown", e => {
     if (e.key === "Delete") {
-      if (selectedTaskId !== null) {
-        deleteTask(selectedTaskId);
-        selectedTaskId = null;
-        draftText = "";
-        renderAll();
-      }
+        if (selectedTaskId !== null && !draftText.trim()) {
+            deleteTask(selectedTaskId);
+            selectedTaskId = null;
+            draftText = "";
+            renderAll();
+        }
     }
   });
 
