@@ -560,15 +560,28 @@
     const currentIdx = STATUSES.indexOf(item.status || 'seed');
     const newStatus = STATUSES[(currentIdx + 1) % STATUSES.length];
     
-    // Only store non-default status
     if (newStatus === 'seed') {
-      delete item.status;
+        delete item.status;
     } else {
-      item.status = newStatus;
+        item.status = newStatus;
     }
     
     item.modified = Date.now();
     saveToLocalStorage();
+    
+    // Atualiza apenas o status no DOM
+    const row = document.querySelector(`[data-item-id="${itemId}"]`);
+    if (row) {
+        row.setAttribute('data-status', getEffectiveStatus(itemId));
+        
+        // Se tem pai, pode precisar atualizar status do pai também
+        if (item.parentId) {
+            const parentRow = document.querySelector(`[data-item-id="${item.parentId}"]`);
+            if (parentRow) {
+                parentRow.setAttribute('data-status', getEffectiveStatus(item.parentId));
+            }
+        }
+    }
   }
 
   /*********************************************************************
@@ -576,46 +589,54 @@
    *********************************************************************/
   function reparentItem(childId, newParentId) {
     if (!itemMap[childId]) return;
-    // Evitar loops
     if (newParentId !== null && isAncestorOrSelf(newParentId, childId)) return;
 
-    // Remover do antigo parent ou root
     const child = itemMap[childId];
-    if (child.parentId === null) {
-      items = items.filter(t => t.id !== childId);
+    const oldParentId = child.parentId;
+    
+    // Remove do DOM atual
+    const childEl = document.querySelector(`[data-item-id="${childId}"]`).closest('li');
+    const oldParentEl = childEl.parentElement;
+    childEl.remove();
+    
+    // Atualiza estrutura de dados
+    if (oldParentId === null) {
+        items = items.filter(t => t.id !== childId);
     } else {
-      const oldParent = itemMap[child.parentId];
-      if (oldParent) {
-        oldParent.children = oldParent.children.filter(c => c.id !== childId);
-        // If last child was removed, delete the children array
-        if (oldParent.children.length === 0) {
-          delete oldParent.children;
+        const oldParent = itemMap[oldParentId];
+        if (oldParent) {
+            oldParent.children = oldParent.children.filter(c => c.id !== childId);
+            if (oldParent.children.length === 0) {
+                delete oldParent.children;
+            }
+            // Atualiza visual do antigo pai
+            renderSingleItem(oldParentId);
         }
-      }
     }
 
-    // Inserir no novo parent ou root
+    // Insere no novo local
     if (newParentId === null) {
-      child.parentId = null;
-      items.push(child);
+        child.parentId = null;
+        items.push(child);
+        // Adiciona ao DOM root
+        renderItem(child, treeRootEl);
     } else {
-      const newParent = itemMap[newParentId];
-      if (!newParent) return; // Se for inválido, não faz nada
-      
-      child.parentId = newParentId;
-      if (!newParent.children) {
-        newParent.children = [];
-      }
-      newParent.children.push(child);
+        const newParent = itemMap[newParentId];
+        if (!newParent) return;
+        
+        child.parentId = newParentId;
+        if (!newParent.children) {
+            newParent.children = [];
+        }
+        newParent.children.push(child);
+        
+        // Atualiza visual do novo pai
+        renderItemAndChildren(newParentId);
     }
     
-    // Update modification time
     child.modified = Date.now();
-    
-    // Seleciona o item
     updateSelection(childId);
     saveToLocalStorage();
-    renderAll();
   }
 
   function isAncestorOrSelf(targetId, maybeChildId) {
@@ -633,14 +654,19 @@
    *********************************************************************/
   function buildVisibleList() {
     const out = [];
+    
     function dfs(arr) {
-      for (const t of arr) {
-        out.push(t);
-        if (!t.collapsed && t.children?.length) {
-          dfs(t.children);
+        if (!arr) return;
+        for (const item of arr) {
+            out.push(item);
+            // Only traverse children if not collapsed
+            if (!item.collapsed && item.children?.length) {
+                dfs(item.children);
+            }
         }
-      }
     }
+    
+    // Start DFS from root items
     dfs(items);
     return out;
   }
@@ -648,69 +674,68 @@
   function selectNextItem() {
     const visible = buildVisibleList();
     if (!visible.length) return;
+    
     if (selectedItemId === null) {
-      updateSelection(visible[0].id);
-    } else {
-      const idx = visible.findIndex(t => t.id === selectedItemId);
-      if (idx < 0) {
         updateSelection(visible[0].id);
-      } else if (idx < visible.length - 1) {
-        updateSelection(visible[idx + 1].id);
-      }
+        return;
     }
-    renderAll();
+    
+    const currentIdx = visible.findIndex(t => t.id === selectedItemId);
+    if (currentIdx === -1 || currentIdx === visible.length - 1) {
+        updateSelection(visible[0].id);
+    } else {
+        updateSelection(visible[currentIdx + 1].id);
+    }
   }
 
   function selectPrevItem() {
     const visible = buildVisibleList();
     if (!visible.length) return;
+    
     if (selectedItemId === null) {
-      updateSelection(visible[visible.length - 1].id);
-    } else {
-      const idx = visible.findIndex(t => t.id === selectedItemId);
-      if (idx < 0) {
-        updateSelection(visible[0].id);
-      } else if (idx > 0) {
-        updateSelection(visible[idx - 1].id);
-      }
+        updateSelection(visible[visible.length - 1].id);
+        return;
     }
-    renderAll();
+    
+    const currentIdx = visible.findIndex(t => t.id === selectedItemId);
+    if (currentIdx <= 0) {
+        updateSelection(visible[visible.length - 1].id);
+    } else {
+        updateSelection(visible[currentIdx - 1].id);
+    }
   }
 
   function selectFirstChild(itemId) {
-    if (itemId === null) return;
-    const t = itemMap[itemId];
-    if (!t || !t.children?.length) return;
+    if (!itemId) return;
+    const item = itemMap[itemId];
+    if (!item?.children?.length) return;
     
-    // If collapsed, expand first
-    if (t.collapsed) {
-      delete t.collapsed;
-      saveToLocalStorage();
+    if (item.collapsed) {
+        item.collapsed = false;
+        saveToLocalStorage();
+        renderItemAndChildren(itemId);
     }
     
-    // Always select first child if available
-    updateSelection(t.children[0].id);
-    renderAll();
+    updateSelection(item.children[0].id);
   }
 
   function selectParentOrCollapse(itemId) {
-    if (itemId === null) return;
-    const t = itemMap[itemId];
-    if (!t) return;
+    if (!itemId) return;
+    const item = itemMap[itemId];
+    if (!item) return;
     
-    // If current item is collapsed, move to parent
-    if (t.collapsed || !t.children?.length) {
-      if (t.parentId) {
-        updateSelection(t.parentId);
-        renderAll();
-      }
-      return;
+    if (!item.children?.length || item.collapsed) {
+        // No children or already collapsed - go to parent
+        if (item.parentId) {
+            updateSelection(item.parentId);
+        }
+    } else {
+        // Has children and expanded - collapse
+        item.collapsed = true;
+        saveToLocalStorage();
+        renderItemAndChildren(itemId);
+        updateSelection(itemId);
     }
-    
-    // If expanded, collapse it
-    t.collapsed = true;
-    saveToLocalStorage();
-    renderAll();
   }
 
   // Add function to move item directly under its grandparent
@@ -735,6 +760,7 @@
     const li = document.createElement("li");
     const row = document.createElement("div");
     row.className = "item-container";
+    row.setAttribute('data-item-id', item.id);
     
     // Adicionar handle para drag & drop
     const dragHandle = document.createElement("span");
@@ -921,14 +947,25 @@
                 // Enter creates child
                 if (selectedItemId === null) {
                     newItem = addTopLevelItem(draftValue);
+                    renderItem(newItem, treeRootEl); // Render only new item
                 } else {
                     newItem = addChildItem(selectedItemId, draftValue);
+                    // Parent will be re-rendered with new child
+                    renderItemAndChildren(selectedItemId);
                 }
             } else { // Tab creates sibling
                 if (selectedItemId === null) {
                     newItem = addTopLevelItem(draftValue);
+                    renderItem(newItem, treeRootEl); // Render only new item
                 } else {
                     newItem = addSiblingItem(selectedItemId, draftValue);
+                    // Re-render parent to show new sibling
+                    const parentId = itemMap[selectedItemId].parentId;
+                    if (parentId) {
+                        renderItemAndChildren(parentId);
+                    } else {
+                        renderItem(newItem, treeRootEl);
+                    }
                 }
             }
 
@@ -936,31 +973,30 @@
                 updateSelection(newItem.id);
             }
             updateDraftValue("");
-            renderAll();
         }
-        return; // Block other navigation when editing
+        return;
     }
 
     // Navigation keys
     if (e.key === "ArrowDown") {
-      e.preventDefault();
-      selectNextItem();
+        e.preventDefault();
+        selectNextItem();
     }
     else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      selectPrevItem();
+        e.preventDefault();
+        selectPrevItem();
     }
     else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      selectFirstChild(selectedItemId);
+        e.preventDefault();
+        selectFirstChild(selectedItemId);
     }
     else if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      selectParentOrCollapse(selectedItemId);
+        e.preventDefault();
+        selectParentOrCollapse(selectedItemId);
     }
     else if (e.key === "Backspace" && e.altKey) {
-      e.preventDefault();
-      moveToGrandparent(selectedItemId);
+        e.preventDefault();
+        moveToGrandparent(selectedItemId);
     }
   }
 
@@ -989,9 +1025,16 @@
     const isInsideTree = treeRootEl.contains(e.target);
     const isInsideRoot = rootInputContainerEl.contains(e.target);
     if (!isInsideTree && !isInsideRoot) {
-      updateSelection(null);
-      updateDraftValue("");
-      renderAll();
+        if (selectedItemId) {
+            updateSelection(null);
+        }
+        if (draftValue) {
+            updateDraftValue("");
+        }
+        // Only update root input if needed
+        if (!items.length || selectedItemId === null) {
+            renderRootInput();
+        }
     }
   });
 
@@ -1071,11 +1114,12 @@
    *            INICIALIZAÇÃO
    *********************************************************************/
   async function init() {
-    // Load initial data from localStorage
     loadFromLocalStorage();
     loadMetaState();
+    
+    // Initial render is still needed, but it's the only full render
     renderAll();
-    // Initialize hash handling after initial data is loaded
+    
     hashHandler = initHashPlaceHandling();
   }
 
@@ -1144,9 +1188,80 @@
 
   // Update selection handlers
   function updateSelection(itemId) {
+    // Remove old selection classes
+    if (selectedItemId) {
+        const oldRow = document.querySelector(`[data-item-id="${selectedItemId}"]`);
+        if (oldRow) {
+            oldRow.classList.remove('selected');
+            // Remove old input if exists
+            const oldInput = oldRow.querySelector('#singleInput');
+            if (oldInput) oldInput.remove();
+        }
+        
+        // Remove ancestor highlights
+        const oldAncestors = getAncestorIds(selectedItemId);
+        oldAncestors.forEach(aid => {
+            const ancestorRow = document.querySelector(`[data-item-id="${aid}"]`);
+            if (ancestorRow) {
+                ancestorRow.classList.remove('ancestor-of-selected');
+            }
+        });
+    }
+    
+    // Update state
     selectedItemId = itemId;
     metaState.selectedItemId = itemId;
+    
+    // Add new selection classes
+    if (itemId) {
+        const newRow = document.querySelector(`[data-item-id="${itemId}"]`);
+        if (newRow) {
+            newRow.classList.add('selected');
+            
+            // Add input field
+            const inputEl = document.createElement("input");
+            inputEl.id = "singleInput";
+            inputEl.value = draftValue;
+            inputEl.onkeydown = handleSingleInputKeyDown;
+            inputEl.oninput = handleInputChange;
+            inputEl.onclick = e => e.stopPropagation();
+            newRow.appendChild(inputEl);
+            setTimeout(() => inputEl.focus(), 0);
+            
+            // Highlight ancestors
+            const newAncestors = getAncestorIds(itemId);
+            newAncestors.forEach(aid => {
+                const ancestorRow = document.querySelector(`[data-item-id="${aid}"]`);
+                if (ancestorRow) {
+                    ancestorRow.classList.add('ancestor-of-selected');
+                }
+            });
+            
+            // Ensure selected item is visible
+            newRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+    
     saveMetaState();
+  }
+
+  // Função auxiliar para atualizar classes de um item
+  function updateItemClasses(itemId) {
+    const row = document.querySelector(`[data-item-id="${itemId}"]`);
+    if (!row) return;
+    
+    // Reset classes
+    row.classList.remove('selected', 'ancestor-of-selected', 'drag-hover');
+    
+    // Add relevant classes
+    if (selectedItemId === itemId) {
+        row.classList.add('selected');
+    }
+    
+    const ancestors = getAncestorIds(selectedItemId);
+    if (ancestors.includes(itemId)) {
+        row.classList.add('ancestor-of-selected');
+    }
   }
 
   // Update draft text handler
@@ -1207,6 +1322,7 @@
                 rebuildItemMap(items);
                 currentProjectId = projectId;
                 lastProjectId = projectId;
+                // Full render is needed here when switching projects
                 renderAll();
             }
         }
@@ -1316,6 +1432,108 @@
     
     // Add to document
     document.body.appendChild(backdrop);
+  }
+
+  // Add this function back
+  function renderItemAndChildren(itemId) {
+    const item = itemMap[itemId];
+    if (!item) return;
+    
+    // Find the container LI element
+    const itemContainer = document.querySelector(`[data-item-id="${itemId}"]`)?.closest('li');
+    if (!itemContainer) return;
+    
+    // Store parent element for later
+    const parentElement = itemContainer.parentElement;
+    
+    // Create new LI element
+    const newLi = document.createElement('li');
+    
+    // Create and append the item container
+    const row = document.createElement('div');
+    row.className = 'item-container';
+    row.setAttribute('data-item-id', item.id);
+    
+    // Add drag handle
+    const dragHandle = document.createElement('span');
+    dragHandle.className = 'drag-handle';
+    dragHandle.textContent = '⋮⋮';
+    dragHandle.draggable = true;
+    dragHandle.addEventListener('dragstart', e => handleDragStart(e, item.id));
+    dragHandle.addEventListener('dragend', e => handleDragEnd(e));
+    row.appendChild(dragHandle);
+    
+    // Add toggle button or placeholder if has children
+    if (item.children?.length) {
+        const toggle = document.createElement('span');
+        toggle.className = 'toggle-btn';
+        toggle.textContent = item.collapsed ? '[+]' : '[-]';
+        toggle.onclick = e => {
+            e.stopPropagation();
+            toggleItemExpand(item.id);
+        };
+        row.appendChild(toggle);
+    } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'toggle-placeholder';
+        row.appendChild(placeholder);
+    }
+    
+    // Add label
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'item-label';
+    labelSpan.textContent = item.value;
+    row.appendChild(labelSpan);
+    
+    // Add selection classes
+    if (selectedItemId === item.id) {
+        row.classList.add('selected');
+    }
+    const ancestors = getAncestorIds(selectedItemId);
+    if (ancestors.includes(item.id)) {
+        row.classList.add('ancestor-of-selected');
+    }
+    
+    // Set status
+    row.setAttribute('data-status', getEffectiveStatus(item.id));
+    
+    // Add event listeners
+    row.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        e.preventDefault();
+        const projectId = HashProtocol.parse(window.location.hash)?.projectId || 'default';
+        window.location.hash = HashProtocol.create(projectId, item.id);
+    });
+    
+    labelSpan.onclick = e => {
+        e.stopPropagation();
+        updateSelection(item.id);
+        updateDraftValue('');
+    };
+    
+    // Add input if selected
+    if (selectedItemId === item.id) {
+        const inputEl = document.createElement('input');
+        inputEl.id = 'singleInput';
+        inputEl.value = draftValue;
+        inputEl.onkeydown = handleSingleInputKeyDown;
+        inputEl.oninput = handleInputChange;
+        inputEl.onclick = e => e.stopPropagation();
+        row.appendChild(inputEl);
+        setTimeout(() => inputEl.focus(), 0);
+    }
+    
+    newLi.appendChild(row);
+    
+    // Add children if not collapsed
+    if (!item.collapsed && item.children?.length) {
+        const childUl = document.createElement('ul');
+        item.children.forEach(child => renderItem(child, childUl));
+        newLi.appendChild(childUl);
+    }
+    
+    // Replace old element with new one
+    itemContainer.replaceWith(newLi);
   }
 </script>
 
