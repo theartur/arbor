@@ -163,6 +163,18 @@
     }
 
     /* Add these new styles */
+    .dialog-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+      opacity: 1;
+      transition: opacity 0.15s ease-in-out;
+    }
+
     .context-dialog {
       position: fixed;
       top: 50%;
@@ -177,16 +189,6 @@
       max-width: 80vw;
       max-height: 80vh;
       overflow-y: auto;
-    }
-
-    .dialog-backdrop {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 999;
     }
 
     .dialog-header {
@@ -1117,47 +1119,68 @@
   function initHashPlaceHandling() {
     let lastProjectId = null;
     let lastResourceId = null;
+    let isProcessingHashChange = false;
 
     async function loadFromHash() {
-      const hash = window.location.hash.slice(1);
-      const context = HashProtocol.parse(hash);
-      
-      // If no context, use 'default' project
-      const projectId = context?.projectId || 'default';
-      
-      // Only reload project data if project ID changes
-      if (projectId !== lastProjectId) {
-        // First try to load from localStorage
-        const projectData = await DataSource.load(projectId);
-        if (projectData) {
-          tasks = projectData;
-        } else {
-          // If no data, use what's already in localStorage
-          loadFromLocalStorage();
+        if (isProcessingHashChange) return;
+        isProcessingHashChange = true;
+
+        const hash = window.location.hash.slice(1);
+        const context = HashProtocol.parse(hash);
+        
+        const projectId = context?.projectId || 'default';
+        
+        // Only reload project data if project ID changes
+        if (projectId !== lastProjectId) {
+            const projectData = await DataSource.load(projectId);
+            if (projectData) {
+                tasks = projectData;
+                rebuildTaskMap(tasks);
+                currentProjectId = projectId;
+                lastProjectId = projectId;
+                renderAll();
+            }
         }
         
-        rebuildTaskMap(tasks);
-        currentProjectId = projectId;
-        lastProjectId = projectId;
-        renderAll();
-      }
-      
-      // Handle dialog visibility
-      if (context?.resourceId !== lastResourceId) {
-        if (context?.resourceId && taskMap[context.resourceId]) {
-          renderContextDialog(context.resourceId);
+        // Reset lastResourceId when there's no resource in context
+        if (!context?.resourceId) {
+            lastResourceId = null;
         }
-        lastResourceId = context?.resourceId;
-      }
+        
+        // Handle dialog visibility
+        if (context?.resourceId !== lastResourceId) {
+            if (context?.resourceId && taskMap[context.resourceId]) {
+                renderContextDialog(context.resourceId);
+            } else if (lastResourceId) {
+                closeDialog(false);
+            }
+            lastResourceId = context?.resourceId;
+        }
+
+        isProcessingHashChange = false;
     }
 
-    // Handle hash changes
-    window.addEventListener('hashchange', (e) => {
-      loadFromHash();
-    }, false);
-    
-    // Initial load
+    window.addEventListener('hashchange', loadFromHash, false);
     loadFromHash();
+    
+    return { loadFromHash, closeDialog };
+  }
+
+  function closeDialog(updateHash = true) {
+    const backdrop = document.querySelector('.dialog-backdrop');
+    if (backdrop) {
+        backdrop.style.opacity = '0';
+        setTimeout(() => {
+            backdrop.remove();
+            if (updateHash) {
+                const projectId = HashProtocol.parse(window.location.hash)?.projectId || 'default';
+                const newHash = HashProtocol.create(projectId);
+                // Use replaceState and trigger hashchange manually
+                history.replaceState(null, '', newHash ? '#' + newHash : '#');
+                window.dispatchEvent(new HashChangeEvent('hashchange'));
+            }
+        }, 150);
+    }
   }
 
   function renderContextDialog(taskId) {
@@ -1173,16 +1196,18 @@
     // Create backdrop
     const backdrop = document.createElement('div');
     backdrop.className = 'dialog-backdrop';
+    
+    // Update backdrop click handler to use HashProtocol
     backdrop.onclick = (e) => {
       if (e.target === backdrop) {
-        backdrop.remove();
-        window.location.hash = currentProjectId;
+        closeDialog();
       }
     };
 
     // Create dialog
     const dialog = document.createElement('div');
     dialog.className = 'context-dialog';
+    dialog.onclick = (e) => e.stopPropagation(); // Prevent clicks from bubbling to backdrop
 
     // Header with close button
     const header = document.createElement('div');
@@ -1194,10 +1219,7 @@
     const closeBtn = document.createElement('button');
     closeBtn.className = 'close-button';
     closeBtn.innerHTML = '×';
-    closeBtn.onclick = () => {
-      backdrop.remove();
-      window.location.hash = currentProjectId;
-    };
+    closeBtn.onclick = closeDialog;
 
     header.appendChild(title);
     header.appendChild(closeBtn);
