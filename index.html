@@ -570,7 +570,7 @@
       t.collapsed = true;
       saveToLocalStorage();
     }
-    if (t.children.length) {
+    if (t.children?.length) {
       updateSelection(t.children[0].id);
     }
   }
@@ -579,7 +579,7 @@
     if (taskId === null) return;
     const t = taskMap[taskId];
     if (!t) return;
-    if (t.collapsed && t.children.length) {
+    if (t.collapsed && t.children?.length) {
       t.collapsed = false;
       saveToLocalStorage();
     } else if (t.parentId) {
