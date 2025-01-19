@@ -175,6 +175,20 @@
   /*********************************************************************
    *                         ESTADO & VARIÁVEIS
    *********************************************************************/
+  // Add data source abstraction first
+  const DataSource = {
+    async save(key, data) {
+      // For now, use localStorage
+      localStorage.setItem(key, JSON.stringify(data));
+    },
+    
+    async load(key) {
+      // For now, use localStorage
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    }
+  };
+
   let tasks = [];          // Lista de tarefas no root
   let taskMap = {};        // Mapa de ID -> objeto da tarefa
   let selectedTaskId = null;
@@ -287,14 +301,14 @@
   /*********************************************************************
    *                      CRIAÇÃO & MODIFICAÇÃO
    *********************************************************************/
-  function createTask(text, parentId = null) {
+  function createTask(text, parentId = null, type = 'actionable') {
     const task = {
       id: crypto.randomUUID(),
       text,
-      modified: Date.now()
+      modified: Date.now(),
+      type // 'actionable' or 'informational'
     };
     
-    // Only add parentId if it exists
     if (parentId) {
       task.parentId = parentId;
     }
@@ -543,6 +557,7 @@
         updateSelection(visible[idx + 1].id);
       }
     }
+    renderAll();
   }
 
   function selectPrevTask() {
@@ -554,39 +569,59 @@
       const idx = visible.findIndex(t => t.id === selectedTaskId);
       if (idx < 0) {
         updateSelection(visible[0].id);
-      } else if (idx === 0) {
-        updateSelection(null);
-      } else {
+      } else if (idx > 0) {
         updateSelection(visible[idx - 1].id);
       }
     }
+    renderAll();
   }
 
   function selectFirstChild(taskId) {
     if (taskId === null) return;
     const t = taskMap[taskId];
-    if (!t) return;
-    if (!t.collapsed) {
-      t.collapsed = true;
+    if (!t || !t.children?.length) return;
+    
+    // If collapsed, expand first
+    if (t.collapsed) {
+      delete t.collapsed;
       saveToLocalStorage();
     }
-    if (t.children?.length) {
-      updateSelection(t.children[0].id);
-    }
+    
+    // Always select first child if available
+    updateSelection(t.children[0].id);
+    renderAll();
   }
 
   function selectParentOrCollapse(taskId) {
     if (taskId === null) return;
     const t = taskMap[taskId];
     if (!t) return;
-    if (t.collapsed && t.children?.length) {
-      t.collapsed = false;
-      saveToLocalStorage();
-    } else if (t.parentId) {
-      updateSelection(t.parentId);
-    } else {
-      updateSelection(null);
+    
+    // If current item is collapsed, move to parent
+    if (t.collapsed || !t.children?.length) {
+      if (t.parentId) {
+        updateSelection(t.parentId);
+        renderAll();
+      }
+      return;
     }
+    
+    // If expanded, collapse it
+    t.collapsed = true;
+    saveToLocalStorage();
+    renderAll();
+  }
+
+  // Add function to move task directly under its grandparent
+  function moveToGrandparent(taskId) {
+    const task = taskMap[taskId];
+    if (!task || !task.parentId) return;
+    
+    const parent = taskMap[task.parentId];
+    if (!parent || !parent.parentId) return;
+    
+    const grandparentId = parent.parentId;
+    reparentTask(taskId, grandparentId);
   }
 
   /*********************************************************************
@@ -734,17 +769,19 @@
       row.appendChild(inputEl);
     }
 
-    row.setAttribute('data-status', task.status || 'seed');
+    const effectiveStatus = getEffectiveStatus(task.id);
+    row.setAttribute('data-status', effectiveStatus);
     
-    // Add click handler directly to the row's ::before pseudo-element area
-    row.addEventListener('click', e => {
-      // Check if click was in the first 30px (emoji area)
-      if (e.offsetX < 30) {
-        e.stopPropagation();
-        cycleTaskStatus(task.id);
-        renderAll();
-      }
-    });
+    // Only allow status cycling for leaf nodes
+    if (!task.children?.length && task.type === 'actionable') {
+      row.addEventListener('click', e => {
+        if (e.offsetX < 30) {
+          e.stopPropagation();
+          cycleTaskStatus(task.id);
+          renderAll();
+        }
+      });
+    }
 
     li.appendChild(row);
 
@@ -759,56 +796,46 @@
   }
 
   function handleSingleInputKeyDown(e) {
-    const text = metaState.draftText.trim();
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (!text) return;
-      if (metaState.selectedTaskId === null) {
-        const newTask = addTopLevelTask(text);
-        updateSelection(newTask.id);
-      } else {
-        const newTask = addChildTask(metaState.selectedTaskId, text);
-        if (newTask) {
+    // If there's text in the input, only allow text navigation
+    if (draftText.trim()) {
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        if (!draftText) return;
+        if (selectedTaskId === null) {
+          const newTask = addTopLevelTask(draftText);
           updateSelection(newTask.id);
+        } else {
+          const newTask = addChildTask(selectedTaskId, draftText);
+          if (newTask) {
+            updateSelection(newTask.id);
+          }
         }
+        updateDraftText("");
+        renderAll();
       }
-      updateDraftText("");
-      renderAll();
+      return; // Block other navigation when editing
     }
-    else if (e.key === "Tab") {
-      e.preventDefault();
-      if (!text) return;
-      if (metaState.selectedTaskId === null) {
-        const newTask = addTopLevelTask(text);
-        updateSelection(newTask.id);
-      } else {
-        const newTask = addSiblingTask(metaState.selectedTaskId, text);
-        if (newTask) {
-          updateSelection(newTask.id);
-        }
-      }
-      updateDraftText("");
-      renderAll();
-    }
-    else if (e.key === "ArrowDown") {
+
+    // Navigation keys
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       selectNextTask();
-      renderAll();
     }
     else if (e.key === "ArrowUp") {
       e.preventDefault();
       selectPrevTask();
-      renderAll();
     }
     else if (e.key === "ArrowRight") {
       e.preventDefault();
-      selectFirstChild(metaState.selectedTaskId);
-      renderAll();
+      selectFirstChild(selectedTaskId);
     }
     else if (e.key === "ArrowLeft") {
       e.preventDefault();
-      selectParentOrCollapse(metaState.selectedTaskId);
-      renderAll();
+      selectParentOrCollapse(selectedTaskId);
+    }
+    else if (e.key === "Backspace" && e.altKey) {
+      e.preventDefault();
+      moveToGrandparent(selectedTaskId);
     }
   }
 
@@ -871,14 +898,16 @@
   /*********************************************************************
    *            INICIALIZAÇÃO
    *********************************************************************/
-  function init() {
-    loadFromLocalStorage();
+  async function init() {
+    await loadFromLocalStorage();
     loadMetaState();
     renderAll();
   }
 
-  // Call init instead of separate load/render calls
-  init();
+  // Call init and handle any errors
+  init().catch(error => {
+    console.error('Initialization error:', error);
+  });
 
   // Add this to help debug
   window.addEventListener('load', () => {
@@ -950,6 +979,56 @@
     draftText = text;
     metaState.draftText = text;
     saveMetaState();
+  }
+
+  // Update status handling to reflect child states
+  function getEffectiveStatus(taskId) {
+    const task = taskMap[taskId];
+    if (!task) return 'seed';
+    
+    // If it has no children, use its own status
+    if (!task.children?.length) {
+      return task.status || 'seed';
+    }
+    
+    // Get all child statuses
+    const childStatuses = task.children.map(child => getEffectiveStatus(child.id));
+    
+    // Priority order (most critical first)
+    const priorityOrder = ['needs-water', 'under-sun', 'blooming', 'harvest', 'dormant', 'pruned', 'seed'];
+    
+    // Return the highest priority status found in children
+    for (const status of priorityOrder) {
+      if (childStatuses.includes(status)) {
+        return status;
+      }
+    }
+    
+    return 'seed';
+  }
+
+  // Add URL hash handling
+  function initHashPlaceHandling() {
+    // Load initial state from hash
+    function loadFromHash() {
+      const hash = window.location.hash.slice(1); // Remove #
+      if (hash) {
+        // Here you would load the specific context based on the hash
+        // This could be a different localStorage key, or a different backend endpoint
+        loadContext(hash);
+      }
+    }
+    
+    // Update hash when context changes
+    function updateHash(contextId) {
+      window.location.hash = contextId;
+    }
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', loadFromHash);
+    
+    // Initial load
+    loadFromHash();
   }
 </script>
 
