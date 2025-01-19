@@ -274,7 +274,7 @@
   let items = [];          // Lista de tarefas no root
   let itemMap = {};        // Mapa de ID -> objeto da tarefa
   let selectedItemId = null;
-  let draftText = "";
+  let draftValue = "";
   
   const LS_KEY = "arbor_items";
   
@@ -294,7 +294,7 @@
   let metaState = {
     selectedItemId: null,
     draggingItemId: null,
-    draftText: ""
+    draftValue: ""
   };
 
   // Add currentProjectId to state
@@ -370,7 +370,7 @@
       // Restore global variables from meta state
       selectedItemId = metaState.selectedItemId;
       draggingItemId = metaState.draggingItemId;
-      draftText = metaState.draftText;
+      draftValue = metaState.draftValue;
       
       // Validate that selected item still exists
       if (selectedItemId && !itemMap[selectedItemId]) {
@@ -386,10 +386,10 @@
   /*********************************************************************
    *                      CRIAÇÃO & MODIFICAÇÃO
    *********************************************************************/
-  function createItem(text, parentId = null, type = 'actionable') {
+  function createItem(value, parentId = null, type = 'actionable') {
     const item = {
       id: crypto.randomUUID(),
-      text,
+      value,
       modified: Date.now(),
       type,
       tldr: '',        // Brief description
@@ -405,18 +405,18 @@
     return item;
   }
 
-  function addTopLevelItem(text) {
-    const t = createItem(text, null);
+  function addTopLevelItem(value) {
+    const t = createItem(value, null);
     items.push(t);
     saveToLocalStorage();
     return t;
   }
 
-  function addChildItem(parentId, text) {
+  function addChildItem(parentId, value) {
     const parent = itemMap[parentId];
     if (!parent) return null;
     
-    const child = createItem(text, parentId);
+    const child = createItem(value, parentId);
     
     // Create children array only when needed
     if (!parent.children) {
@@ -431,11 +431,11 @@
     return child;
   }
 
-  function addSiblingItem(itemId, text) {
+  function addSiblingItem(itemId, value) {
     const item = itemMap[itemId];
     if (!item) return null;
     const parentId = item.parentId;
-    const newItem = createItem(text, parentId);
+    const newItem = createItem(value, parentId);
 
     if (parentId === null) {
       // Irmão top-level
@@ -481,7 +481,7 @@
     
     removeFromMap(item);
     updateSelection(nextSelectedId);
-    updateDraftText("");
+    updateDraftValue("");
     saveToLocalStorage();
   }
 
@@ -801,7 +801,7 @@
     // Label (agora selecionável)
     const labelSpan = document.createElement("span");
     labelSpan.className = "item-label";
-    labelSpan.textContent = item.text;
+    labelSpan.textContent = item.value;
     row.appendChild(labelSpan);
     
     // Add double-click handler to the row
@@ -816,7 +816,7 @@
     labelSpan.onclick = e => {
       e.stopPropagation();
       updateSelection(item.id);
-      updateDraftText("");
+      updateDraftValue("");
       renderAll();
     };
 
@@ -824,7 +824,7 @@
     if (selectedItemId === item.id) {
       const inputEl = document.createElement("input");
       inputEl.id = "singleInput";
-      inputEl.value = draftText;
+      inputEl.value = draftValue;
       inputEl.onkeydown = handleSingleInputKeyDown;
       inputEl.oninput = handleInputChange;
       inputEl.onclick = e => e.stopPropagation();
@@ -874,7 +874,7 @@
   function renderRootInput() {
     const inputEl = document.createElement("input");
     inputEl.id = "singleInput";
-    inputEl.value = draftText;
+    inputEl.value = draftValue;
     inputEl.placeholder = "Digite para adicionar ao root...";
     inputEl.onkeydown = handleSingleInputKeyDown;
     inputEl.oninput = handleInputChange;
@@ -901,31 +901,31 @@
 
   function handleSingleInputKeyDown(e) {
     // If there's text in the input, only allow text navigation
-    if (draftText.trim()) {
+    if (draftValue.trim()) {
         if (e.key === "Enter" || e.key === "Tab") {
             e.preventDefault();
-            if (!draftText) return;
+            if (!draftValue) return;
 
             let newItem;
             if (e.key === "Enter") {
                 // Enter creates child
                 if (selectedItemId === null) {
-                    newItem = addTopLevelItem(draftText);
+                    newItem = addTopLevelItem(draftValue);
                 } else {
-                    newItem = addChildItem(selectedItemId, draftText);
+                    newItem = addChildItem(selectedItemId, draftValue);
                 }
             } else { // Tab creates sibling
                 if (selectedItemId === null) {
-                    newItem = addTopLevelItem(draftText);
+                    newItem = addTopLevelItem(draftValue);
                 } else {
-                    newItem = addSiblingItem(selectedItemId, draftText);
+                    newItem = addSiblingItem(selectedItemId, draftValue);
                 }
             }
 
             if (newItem) {
                 updateSelection(newItem.id);
             }
-            updateDraftText("");
+            updateDraftValue("");
             renderAll();
         }
         return; // Block other navigation when editing
@@ -955,7 +955,7 @@
   }
 
   function handleInputChange(e) {
-    updateDraftText(e.target.value);
+    updateDraftValue(e.target.value);
   }
 
   /*********************************************************************
@@ -963,10 +963,10 @@
    *********************************************************************/
   document.addEventListener("keydown", e => {
     if (e.key === "Delete") {
-        if (selectedItemId !== null && !draftText.trim()) {
+        if (selectedItemId !== null && !draftValue.trim()) {
             deleteItem(selectedItemId);
             selectedItemId = null;
-            draftText = "";
+            draftValue = "";
             renderAll();
         }
     }
@@ -980,7 +980,7 @@
     const isInsideRoot = rootInputContainerEl.contains(e.target);
     if (!isInsideTree && !isInsideRoot) {
       updateSelection(null);
-      updateDraftText("");
+      updateDraftValue("");
       renderAll();
     }
   });
@@ -1088,7 +1088,7 @@
       // Create new object with only necessary properties
       const cleaned = {
         id: item.id,
-        text: item.text,
+        value: item.value,
         modified: item.modified || now  // Ensure modified always exists
       };
       
@@ -1140,9 +1140,9 @@
   }
 
   // Update draft text handler
-  function updateDraftText(text) {
-    draftText = text;
-    metaState.draftText = text;
+  function updateDraftValue(value) {
+    draftValue = value;
+    metaState.draftValue = value;
     saveMetaState();
   }
 
@@ -1273,7 +1273,7 @@
     header.className = 'dialog-header';
     
     const title = document.createElement('h2');
-    title.textContent = item.text;
+    title.textContent = item.value;
     
     const closeBtn = document.createElement('button');
     closeBtn.className = 'close-button';
@@ -1293,7 +1293,7 @@
       <p><strong>ID:</strong> ${item.id}</p>
       <p><strong>Status:</strong> ${item.status || 'seed'}</p>
       <p><strong>Modified:</strong> ${new Date(item.modified).toLocaleString()}</p>
-      ${item.parentId ? `<p><strong>Parent:</strong> ${itemMap[item.parentId]?.text || 'Unknown'}</p>` : ''}
+      ${item.parentId ? `<p><strong>Parent:</strong> ${itemMap[item.parentId]?.value || 'Unknown'}</p>` : ''}
       ${item.children?.length ? `<p><strong>Children:</strong> ${item.children.length}</p>` : ''}
     `;
     
