@@ -1,0 +1,286 @@
+<body><script>
+
+    // this is bodyscript
+
+    // basically, 
+    // a super to-do list
+    // multilevel
+    // indexedDB based
+
+    // ul and ol based
+    // super efficient
+
+    // para ser super eficiente, devemos controlar o textContent das folhas
+    // em vez de ficar reconstruindo a DOM um bilhão de vezes por segundo
+    // controla apenas o texto que está dentro, caso seja diferente
+    // como tornar isso uma cascata?
+
+    // precisamos de um agente atualizador para isso
+    // temos a base da verdade, que é o objeto raíz "arbor"
+    // arbors se conectam infinitamente
+    // arbor sempre se refere à raíz
+    // arbor, então é o item
+
+    // um arbor é um objeto vazio JS
+    // que você pode colocar o que quiser dentro
+    // todo arbor deve ter uma identidade própria (id)
+    // a eficiência está atrelada ao IndexedDB
+
+    // precisamos filosofar sobre o arbor, exclusivamente
+
+    // o arbor é um saco vazio de infinitas possibilidades
+    // ele nasce vazio mas logo ganha uma identidade única
+
+    // todo arbor tem apenas 1 único valor
+    // o valor do arbor pode ser uma lista
+
+    // cada arbor assume um papel conveniente de acordo com sua função
+
+    // o arbor raíz é o ponto inicial
+    // um arbor primitivo é um arbor com valor JS primitivo (string, number, boolean)
+    // um arbor complexo é um arbor com um objeto (array, object)
+
+    // o arbor primitivo carrega valores (dados, configurações, parâmetros)
+    // o arbor complexo carrega referências (listas ordenadas, listas não ordenadas)
+
+    // arbor precisa ser uma classe
+
+    class Arbor {
+        id;
+        value;
+
+        constructor(arbor) {
+            const now = +new Date;
+            const isPrimitive = arbor !== Object(arbor);
+            if (isPrimitive) {
+                this.id = crypto.randomUUID();
+                this.value = arbor;
+            } else {
+                const {
+                    id = crypto.randomUUID(),
+                    value
+                } = arbor;
+                this.id = id;
+                this.value = value;
+
+                for (const key of Object.keys(arbor)) {
+                    if (['id', 'value'].includes(key)) continue;
+                    this[key] = arbor[key];
+                }
+            }
+        }
+    }
+
+    class ArborGraph {
+        static db = null;
+
+        static async init(database = 'arbor') {
+          return new Promise((resolve, reject) => {
+            const request = indexedDB.open(database, 1);
+
+            request.onupgradeneeded = (event) => {
+              const db = event.target.result;
+              if (!db.objectStoreNames.contains('arbors')) {
+                const arborStore = db.createObjectStore('arbors', { keyPath: 'id' });
+                arborStore.createIndex('createdIndex', 'created', { unique: false });
+                arborStore.createIndex('valueIndex', 'value', { unique: false });
+              }
+            };
+
+            request.onsuccess = event => {
+              this.db = event.target.result;
+              resolve(this.db);
+            };
+            request.onerror = event => {
+              reject(`Error opening DB: ${event.target.error}`);
+            };
+          });
+        }
+
+        static async add(arbor) {
+          return new Promise((resolve, reject) => {
+            if (!this.db) {
+                reject(`DB NOT READY`);
+                return;
+            }
+
+            arbor.created = +new Date;
+
+            const db = this.db;
+            const tx = db.transaction(['arbors'], 'readwrite');
+            const store = tx.objectStore('arbors');
+            const request = store.add(arbor);
+
+            request.onsuccess = () => {
+              resolve(request.result); // returns the generated id
+            };
+            request.onerror = (event) => {
+              reject(`Add arbor error: ${event.target.error}`);
+            };
+          });
+        }
+
+        static async edit(arbor) {
+          return new Promise((resolve, reject) => {
+            if (!this.db) {
+                reject(`DB NOT READY`);
+                return;
+            }
+
+            arbor.edited = +new Date;
+
+            const db = this.db;
+            const tx = db.transaction(['arbors'], 'readwrite');
+            const store = tx.objectStore('arbors');
+            const request = store.put(arbor);
+
+            request.onsuccess = () => {
+              resolve(request.result); // returns the generated id
+            };
+            request.onerror = (event) => {
+              reject(`Add arbor error: ${event.target.error}`);
+            };
+          });
+        }
+
+        static async get(id) {
+          return new Promise((resolve, reject) => {
+            if (!this.db) {
+                reject(`DB NOT READY`);
+                return;
+            }
+            const db = this.db;
+            const tx = db.transaction(['arbors'], 'readonly');
+            const store = tx.objectStore('arbors');
+            const request = store.get(id);
+
+            request.onsuccess = () => {
+              resolve(request.result);
+            };
+            request.onerror = (event) => {
+              reject(`Get arbor error: ${event.target.error}`);
+            };
+          });
+        }
+
+        static async list() {
+          return new Promise((resolve, reject) => {
+            if (!this.db) {
+                reject(`DB NOT READY`);
+                return;
+            }
+            const db = this.db;
+            const tx = db.transaction(['arbors'], 'readonly');
+            const store = tx.objectStore('arbors');
+
+            const request = store.openCursor();
+            const items = [];
+
+            request.onsuccess = (event) => {
+              const cursor = event.target.result;
+              if (cursor) {
+                items.push(cursor.value);
+                cursor.continue();
+              } else {
+                // No more arbors
+                resolve(items);
+              }
+            };
+
+            request.onerror = (event) => {
+              reject(`list() error: ${event.target.error}`);
+            };
+          });
+        }
+
+        static async page(pageNumber = 1, pageItemCount = 10) {
+          const skip = (pageNumber - 1) * pageItemCount;
+          
+          return new Promise((resolve, reject) => {
+            if (!this.db) {
+                reject(`DB NOT READY`);
+                return;
+            }
+            const db = this.db;
+            const tx = db.transaction(['arbors'], 'readonly');
+            const store = tx.objectStore('arbors');
+            const index = store.index('createdIndex');
+            // Could also use an index if you want a specific ordering, 
+            // but here we just open a cursor on the default (primary key) order.
+            // store.index('createdIndex').openCursor
+            // openCursor(keyRange, direction) - "next" means ascending order
+            const request = index.openCursor(null, 'prev');
+
+            let currentIndex = 0;
+            const items = [];
+
+            request.onsuccess = (event) => {
+              const cursor = event.target.result;
+              if (cursor) {
+                if (currentIndex >= skip && items.length < pageItemCount) {
+                  items.push(new Arbor(cursor.value));
+                }
+                currentIndex++;
+                
+                // Stop if we've got enough items
+                if (items.length < pageItemCount) {
+                  cursor.continue();
+                } else {
+                  resolve(items);
+                }
+              } else {
+                // No more arbors or we reached the end
+                resolve(items);
+              }
+            };
+
+            request.onerror = (event) => {
+              reject(`page() error: ${event.target.error}`);
+            };
+          });
+        }
+    }
+
+    async function init() {
+        await ArborGraph.init();
+        
+        const arbor = new Arbor(new Date().toISOString())
+        console.log({ arbor });
+
+        // STORE ARBOR
+        const id = await ArborGraph.add(arbor);
+        console.log({ id });
+
+        const retrieved = await ArborGraph.get(id);
+        console.log({ retrieved: JSON.stringify(retrieved) });
+
+        render(document.body);
+    }
+
+    async function render(container) {
+        const items = await ArborGraph.page(1, 10);
+
+        for (const item of items) {
+            console.log("ARBOR: ", item);
+            let elem = document.getElementById(item.id);
+            let shouldRender = !elem;
+            if (shouldRender) {
+                console.log("CREATE!!!: ", item);
+                elem = document.createElement('div');
+                elem.id = item.id;
+            }
+            console.log("edit???", {curr:elem.dataset['value'], newa: item.value});
+            if (elem.dataset['value'] !== item.value) {
+                console.log("edit: ", item);
+                elem.dataset['value'] = item.value;
+                elem.textContent = `${item.id}: ${item.value}`;
+            }
+            if (shouldRender) {
+                container.appendChild(elem);
+            }
+        }
+    }
+
+    init();
+
+</script>
