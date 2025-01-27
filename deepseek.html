@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Arbor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    .item {
+      display: flex;
+      align-items: center;
+      margin: 5px 0;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .item:hover {
+      background-color: #f9f9f9;
+    }
+    .item-handle {
+      cursor: grab;
+      margin-right: 10px;
+      user-select: none;
+    }
+    .item-status {
+      margin-right: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .item-content {
+      flex-grow: 1;
+    }
+    .item-content input {
+      width: 100%;
+      border: none;
+      background: transparent;
+    }
+    .item-content input:focus {
+      outline: none;
+    }
+    .children {
+      margin-left: 20px;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Project Arbor</h1>
+  <div id="arbor"></div>
+
+  <script>
+    class Arbor {
+      constructor() {
+        this.items = new Map();
+        this.root = this.createItem({ title: "Root" });
+        this.focusedItem = null;
+        this.load();
+        this.render();
+        window.addEventListener('hashchange', () => this.handleHashChange());
+      }
+
+      createItem(data) {
+        const item = {
+          id: crypto.randomUUID(),
+          title: data.title || '',
+          status: data.status || 'open',
+          children: [],
+          links: [],
+          ...data
+        };
+        this.items.set(item.id, item);
+        this.save();
+        return item;
+      }
+
+      deleteItem(id) {
+        const item = this.items.get(id);
+        if (!item) return;
+
+        // Remove from parent's children
+        const parent = this.findParent(item.id);
+        if (parent) {
+          parent.children = parent.children.filter(child => child.id !== item.id);
+        }
+
+        // Remove from memory
+        this.items.delete(id);
+        this.save();
+
+        // Move focus
+        if (this.focusedItem === id) {
+          if (parent) {
+            this.focusItem(parent.children[0]?.id || parent.id);
+          } else {
+            this.focusItem(null);
+          }
+        }
+      }
+
+      findParent(id) {
+        for (const item of this.items.values()) {
+          if (item.children.some(child => child.id === id)) {
+            return item;
+          }
+        }
+        return null;
+      }
+
+      focusItem(id) {
+        this.focusedItem = id;
+        this.render();
+      }
+
+      toggleStatus(id) {
+        const item = this.items.get(id);
+        if (!item) return;
+
+        if (item.children.length === 0) {
+          item.status = item.status === 'open' ? 'done' : 'open';
+        } else {
+          // Parent status is derived from children
+          const childStatuses = item.children.map(child => child.status);
+          item.status = childStatuses.includes('open') ? 'open' : 'done';
+        }
+        this.save();
+        this.render();
+      }
+
+      save() {
+        localStorage.setItem('arbor', JSON.stringify([...this.items]));
+      }
+
+      load() {
+        const data = localStorage.getItem('arbor');
+        if (data) {
+          this.items = new Map(JSON.parse(data));
+        }
+      }
+
+      handleHashChange() {
+        const id = window.location.hash.slice(1);
+        if (this.items.has(id)) {
+          this.focusItem(id);
+        }
+      }
+
+      render() {
+        const arborElement = document.getElementById('arbor');
+        arborElement.innerHTML = '';
+        arborElement.appendChild(this.renderItem(this.root));
+      }
+
+      renderItem(item) {
+        const itemElement = document.createElement('div');
+        itemElement.classList.add('item');
+        if (item.id === this.focusedItem) {
+          itemElement.style.backgroundColor = '#e0f7fa';
+        }
+
+        // Handle for drag-and-drop
+        const handle = document.createElement('div');
+        handle.classList.add('item-handle');
+        handle.textContent = '⠿';
+        itemElement.appendChild(handle);
+
+        // Status icon
+        const status = document.createElement('div');
+        status.classList.add('item-status');
+        status.textContent = item.status === 'done' ? '✔' : '◯';
+        status.onclick = () => this.toggleStatus(item.id);
+        itemElement.appendChild(status);
+
+        // Content
+        const content = document.createElement('div');
+        content.classList.add('item-content');
+        const input = document.createElement('input');
+        input.value = item.title;
+        input.oninput = (e) => {
+          item.title = e.target.value;
+          this.save();
+        };
+        input.onfocus = () => this.focusItem(item.id);
+        input.onkeydown = (e) => this.handleKeyDown(e, item);
+        content.appendChild(input);
+        itemElement.appendChild(content);
+
+        // Children
+        if (item.children.length > 0) {
+          const childrenElement = document.createElement('div');
+          childrenElement.classList.add('children');
+          item.children.forEach(child => {
+            childrenElement.appendChild(this.renderItem(child));
+          });
+          itemElement.appendChild(childrenElement);
+        }
+
+        return itemElement;
+      }
+
+      handleKeyDown(e, item) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const newItem = this.createItem({ title: '' });
+          item.children.push(newItem);
+          this.focusItem(newItem.id);
+          this.render();
+        } else if (e.key === 'Delete' && item.title === '') {
+          this.deleteItem(item.id);
+        }
+      }
+    }
+
+    const arbor = new Arbor();
+  </script>
+</body>
+</html>
