@@ -1,0 +1,3115 @@
+<body><script>
+
+    document.title = `🌳 Arbor`;
+
+    const ARBOR_SHORTCUTS = {
+
+        'ArrowUp':        'navigateUp',
+        'ArrowRight':     'navigateRight',
+        'ArrowDown':      'navigateDown',
+        'ArrowLeft':      'navigateLeft',
+        'Enter':          'addChild',
+        'Shift+Tab':      'addPreviousSibling',
+        'Tab':            'addSibling',
+        'E':              'edit',
+        'Escape':         'cancel',
+        'Delete':         'delete',
+        ' ':              'toggle',
+        'Backspace':      'close',
+        'MouseLeftClick': 'clickHandler',
+        'V':              'toggleChecked',
+        'C':              'copyUUID'
+
+    };
+
+    const ARBOR_STYLES = `
+
+        :root {
+            color-scheme: dark;
+
+            --arbor-dark: #333;
+            --arbor-clear: #eee;
+            --arbor-green: #b3cc57;
+            --arbor-lightgreen: #ecf081;
+            --arbor-orange: #ffbe40;
+            --arbor-pink: #ef746f;
+            --arbor-wine: #ab3e5b;
+
+            --arbor-bg: linear-gradient(315deg, color-mix(in srgb, var(--arbor-pink), transparent 90%), color-mix(in srgb, var(--arbor-wine), var(--arbor-dark) 95%));
+            --arbor-uuid: var(--arbor-lightgreen);
+            --arbor-drop-target: color-mix(in srgb, var(--arbor-lightgreen), transparent 50%);
+            --arbor-li-bg: color-mix(in srgb, var(--arbor-lightgreen), transparent 95%);
+            --arbor-li-hover-bg: color-mix(in srgb, var(--arbor-lightgreen), transparent 90%);
+            --arbor-drag-handle: color-mix(in srgb, var(--arbor-lightgreen), transparent 25%);
+            --arbor-check-solved: color-mix(in srgb, var(--arbor-green), var(--arbor-dark) 30%);
+            --arbor-check-solved-hover: color-mix(in srgb, var(--arbor-green), var(--arbor-dark) 15%);
+            --arbor-summary: color-mix(in srgb, var(--arbor-orange), transparent 50%);
+            --arbor-summary-open: color-mix(in srgb, var(--arbor-pink), transparent 85%);
+            --arbor-summary-open-hover: color-mix(in srgb, var(--arbor-orange), transparent 75%);
+        }
+
+        :root.theme {
+            color-scheme: dark;
+
+            --arbor-hue: 0deg;
+            --arbor-saturation: 0%;
+            --arbor-lightness: 0%;
+            
+            /* theme defaults with proper color theory */
+            --bg-color: light-dark(hsl(var(--arbor-hue), calc(var(--arbor-saturation) * 0.2), 95%), hsl(var(--arbor-hue), calc(var(--arbor-saturation) * 0.2), 8%));
+            --text-color: light-dark(hsl(var(--arbor-hue), calc(var(--arbor-saturation) * 0.1), 10%), hsl(var(--arbor-hue), calc(var(--arbor-saturation) * 0.1), 95%));
+            --primary-color: light-dark(hsl(var(--arbor-hue), var(--arbor-saturation), calc(var(--arbor-lightness) - 5%)), hsl(var(--arbor-hue), var(--arbor-saturation), calc(var(--arbor-lightness) + 10%)));
+            --secondary-color: light-dark(hsl(calc(var(--arbor-hue) + 30deg), var(--arbor-saturation), var(--arbor-lightness)), hsl(calc(var(--arbor-hue) + 30deg), var(--arbor-saturation), var(--arbor-lightness)));
+            --accent-color: light-dark(hsl(calc(var(--arbor-hue) + 180deg), var(--arbor-saturation), var(--arbor-lightness)), hsl(calc(var(--arbor-hue) + 180deg), var(--arbor-saturation), calc(var(--arbor-lightness) + 5%)));
+            --tertiary-color: light-dark(hsl(calc(var(--arbor-hue) + 120deg), var(--arbor-saturation), calc(var(--arbor-lightness) + 5%)), hsl(calc(var(--arbor-hue) + 120deg), var(--arbor-saturation), calc(var(--arbor-lightness) + 20%)));
+            --quaternary-color: light-dark(hsl(calc(var(--arbor-hue) + 240deg), var(--arbor-saturation), calc(var(--arbor-lightness) + 5%)), hsl(calc(var(--arbor-hue) + 240deg), var(--arbor-saturation), calc(var(--arbor-lightness) + 20%)));
+
+            --arbor-dark: var(--bg-color);
+            --arbor-clear: var(--text-color);
+            --arbor-green: var(--primary-color);
+            --arbor-lightgreen: var(--tertiary-color);
+            --arbor-orange: var(--accent-color);
+            --arbor-pink: var(--secondary-color);
+            --arbor-wine: var(--quaternary-color);
+
+            --arbor-bg: linear-gradient(315deg, color-mix(in srgb, var(--arbor-wine), var(--arbor-dark) 95%), color-mix(in srgb, var(--arbor-pink), transparent 90%));
+            --arbor-uuid: color-mix(in srgb, var(--arbor-lightgreen), transparent 25%);
+            --arbor-drop-target: color-mix(in srgb, var(--arbor-lightgreen), transparent 50%);
+            --arbor-li-bg: color-mix(in srgb, var(--arbor-lightgreen), transparent 95%);
+            --arbor-li-hover-bg: color-mix(in srgb, var(--arbor-lightgreen), transparent 90%);
+            --arbor-drag-handle: color-mix(in srgb, var(--arbor-lightgreen), transparent 25%);
+            --arbor-check-solved: color-mix(in srgb, var(--arbor-green), var(--arbor-dark) 30%);
+            --arbor-check-solved-hover: color-mix(in srgb, var(--arbor-green), var(--arbor-dark) 15%);
+            --arbor-summary: color-mix(in srgb, var(--arbor-orange), transparent 50%);
+            --arbor-summary-open: color-mix(in srgb, var(--arbor-pink), transparent 85%);
+            --arbor-summary-open-hover: color-mix(in srgb, var(--arbor-orange), transparent 75%);
+
+            xanimation: rotateHue 1s linear infinite;
+        }
+
+        html {
+            background: var(--arbor-bg);
+            xbackground: linear-gradient(315deg, var(--arbor-clear), var(--arbor-pink));
+            color: var(--arbor-clear);
+            font: 0.8rem sans-serif;
+            padding-bottom: 25vh;
+            xbox-shadow: inset 0 0 50vmin #eee;
+        }
+
+        body > header {
+            min-height: 137px;
+            xbackground: pink;
+        }
+
+        body > header > h1 {
+            font-weight: bold;
+            margin: 10px 44px;
+            display: inline-block;
+            font-size: 48px;
+            text-shadow: -2px 0px 0px var(--arbor-wine), 2px 0px 0px var(--arbor-green), 0px -2px 0px var(--arbor-lightgreen), 0px 2px 0px var(--arbor-pink);
+            transition: transform .5s ease;
+        }
+
+        body > header > h1:hover {
+            transform: scale(1.1);
+        }
+
+        body > header > h1 > a {
+            text-decoration: none;
+            color: var(--arbor-clear);
+        }
+
+        body > header > .menu {
+            position: absolute;
+            top: 25px;
+            right: 20px;
+            background: var(--arbor-li-bg);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+        }
+
+        body > header > .menu > button {
+            margin: 5px;
+            padding: 10px 15px;
+            background: var(--arbor-li-bg);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        body > header > .menu > input[type="color"] {
+            position: absolute;
+            right: -10px;
+            top: -17px;
+            width: 25px;
+            height: 30px;
+            margin: 5px;
+            padding: 0;
+            cursor: pointer;
+            display: none;
+        }
+
+        .theme body > header > .menu:hover > input[type="color"] {
+            display: block;
+        }
+
+        body > header > .menu > button:hover {
+            background: var(--arbor-li-hover-bg);
+        }
+
+        .root-info {
+            width: 95%;
+            background: var(--arbor-li-bg);
+            border-radius: 5px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .root-info > div {
+            margin-bottom: 10px;
+            display: flex;
+        }
+
+        .root-info > div > strong,
+        .root-info > div > span {
+            padding: 5px;
+        }
+
+        .root-info > div > strong {
+            display: inline-block;
+            flex: 0 0 250px;
+            text-align: right;
+            margin: 0 15px 0 0;
+            vertical-align: top;
+            color: var(--arbor-pink);
+        }
+
+        .root-info > div > span {
+            display: inline-block;
+            flex: 1;
+        }
+
+        .root-info > h1 {
+            margin: 0 0 20px 0;
+            padding-bottom: 15px;
+            text-align: center;
+            border-bottom: 1px solid var(--arbor-summary-open-hover);
+        }
+
+        .root-info > .actions {
+            display: block;
+            text-align: right;
+        }
+
+        .root-info > .actions button {
+            display: inline-block;
+            background: var(--arbor-pink);
+            border: none;
+            border-radius: 5px;
+            margin: 40px 0 0 20px;
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .root-info > .actions button:hover {
+            background: var(--arbor-lightgreen);
+            color: var(--arbor-dark);
+        }
+
+        .root-info > .actions button.ai-desc.loading {
+            background: var(--arbor-dark);
+        }
+
+        .root-info > .actions button.ai-desc.loading span {
+            display: inline-block;
+            color: transparent;
+            text-shadow: 0 0 0 var(--arbor-clear);
+            animation: spin 2s linear infinite;
+            transform-origin: center center;
+            opacity: .5;
+        }
+
+        .root-info > .actions button.ai-desc.loading:hover {
+            color: transparent;
+        }
+
+        .root-info .progress span {
+            font-weight: bold;
+            font-size: 24px;
+            text-shadow: 0 0 5px;
+        }
+
+        arbor-root {
+            cursor: default;
+        }
+
+        arbor-root ol {
+            counter-reset: list-counter;
+            pointer-events: none;
+        }
+
+        arbor-root li {
+            pointer-events: auto;
+        }
+
+        arbor-root ol > li:not(.drop-target) {
+            counter-increment: list-counter;
+        }
+
+        arbor-root ol > li:not(.drop-target)::before {
+            content: counter(list-counter) ". ";
+            position: absolute;
+            top: 10px;
+            left: -33px;
+            text-align: right;
+            width: 30px;
+        }
+
+        arbor-root li.drop-target::before {
+            content: "";
+        }
+
+        arbor-root li.drop-target {
+            list-style: none;
+            counter-increment: none;
+            height: 20px;
+            background: var(--arbor-drop-target);
+        }
+
+        arbor-root li {
+          position: relative;
+          list-style: none;
+          border-radius: 5px;
+          margin: 10px;
+          background: var(--arbor-li-bg);
+          transition: border 100ms ease;
+        }
+
+        arbor-root > ol > li > details {
+            interpolate-size: allow-keywords;
+            border-radius: 5px;
+
+            &::details-content {
+                transition:
+                block-size .1s,
+                content-visibility .1s allow-discrete;
+                overflow: hidden;
+                block-size: 0;     /* Or also:  height:0; */
+            }
+
+            &[open]::details-content {
+                block-size: auto;  /* Or also:  height:auto; */
+            }
+        }
+
+        arbor-root li:hover {
+            background: var(--arbor-li-hover-bg);
+        }
+
+        arbor-root summary {
+            padding: 10px 10px 10px 30px;
+            border-left: 5px solid var(--arbor-li-hover-bg);
+            transition: font-size 100ms ease, border-left 150ms ease;
+            position: relative;
+            list-style: none;
+            border-radius: 5px;
+        }
+
+        arbor-root summary.dragging {
+            background: var(--arbor-lightgreen);
+        }
+
+        arbor-root summary .drag-handle {
+            content: "≡";
+            position: absolute;
+            left: 30px;
+            top: 0px;
+            bottom: 0;
+            width: 25px;
+            line-height: 2.9;
+            color: var(--arbor-drag-handle);
+            cursor: grab;
+            user-select: none;
+            padding-left: 10px;
+        }
+
+        arbor-root summary .checkpoint-box {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            background: var(--arbor-clear);
+            position: absolute;
+            top: 7px;
+            left: 7px;
+            border-radius: 2px;
+            border: 1px solid var(--arbor-dark);
+            font-weight: bold;
+            text-align: center;
+            line-height: 2;
+            font-size: 0.8rem;
+            color: var(--arbor-dark);
+            white-space: nowrap;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        arbor-root summary .checkpoint-box.solved {
+            color: transparent;
+            text-shadow: 0 0 0 var(--arbor-check-solved);
+            background: radial-gradient(var(--arbor-lightgreen) 25%, transparent);
+            border: none;
+            border-radius: 50%;
+        }
+
+        arbor-root summary .checkpoint-box.solved:hover {
+            text-shadow: 0 0 0 var(--arbor-check-solved-hover);
+            background: var(--arbor-clear);
+        }
+
+        arbor-root summary .checkpoint-box:empty {
+            cursor: pointer;
+        }
+
+        arbor-root summary .checkpoint-box.progress {
+            font-size: 0.6rem;
+            line-height: 2.7;
+            color: var(--arbor-dark);
+            transition: transform .25s ease;
+        }
+
+        arbor-root summary .checkpoint-box.progress:hover {
+            transform: scale(2.5);
+        }
+
+        arbor-root summary .checkpoint-box .progressbar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 100%;
+            background-color: var(--arbor-green);
+            z-index: 1;
+            transition: width 2s ease;
+        }
+
+        arbor-root summary .checkpoint-box .percentage {
+            position: relative;
+            z-index: 2;
+            font-family: monospace;
+        }
+
+        arbor-root summary h1 {
+            display: inline-block;
+            font-size: 1.2rem;
+            margin: 0 0 0 35px;
+            width: calc(100% - 35px);
+            cursor: pointer;
+            font-weight: normal;
+            text-shadow: 1px 1px var(--arbor-dark);
+        }
+
+        arbor-root details[open] > summary {
+            background: var(--arbor-summary-open);
+        }
+
+        arbor-root details[open] > summary:hover {
+            background: var(--arbor-summary-open-hover);
+        }
+
+        arbor-root details[open] > summary > h1 {
+            font-weight: bold;
+        }
+
+        arbor-root summary strong {
+            position: relative;
+            display: inline-block;
+            top: -2px;
+            font-size: 0.8rem;
+            font-family: monospace;
+            text-transform: uppercase;
+            width: 45px;
+            color: var(--arbor-uuid);
+            xtext-shadow: 1px 1px var(--arbor-clear)
+        }
+
+        arbor-root summary strong:hover {
+            color: var(--arbor-clear);
+        }
+
+        arbor-root summary input {
+            width: calc(100% - 45px);
+            padding: 10px;
+        }
+
+        arbor-root summary:hover {
+            border-left: 5px solid var(--arbor-summary);
+            background: var(--arbor-summary);
+        }
+
+        arbor-root summary:focus {
+            outline: 5px double var(--arbor-orange);
+            border-radius: 5px;
+        }
+
+        .glow {
+          animation: glowAnimation .5s forwards;
+        }
+
+        @keyframes glowAnimation {
+          0% {
+            text-shadow: 0 0 25px var(--arbor-clear);
+            color: var(--arbor-green);
+          }
+          100% {
+            text-shadow: none;
+            color: var(--arbor-clear);
+          }
+        }
+
+        @keyframes rotateHue {
+          from {
+            --arbor-hue: 0;
+          }
+          to {
+            --arbor-hue: 360;
+          }
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+    `;
+
+    onhashchange = () => location.reload();
+    onbeforeunload = () => {
+        localStorage.scrollPosition = scrollY;
+    };
+
+    let log = console.log.bind(console);
+    // log = () => {};
+
+    class ArborRoot extends HTMLElement {
+        parent = 'root';
+        id = this.getContextId();
+        database = this.getAttribute('database') ?? 'arbor_db';
+        store = this.getAttribute('store') ?? 'arbor_store';
+        meta = this.getAttribute('meta') ?? 'arbor_meta';
+
+        constructor() {
+            super();
+            
+            log("CONSTRUCTOR", {
+                parent: this.parent,
+                id: this.id,
+                database: this.database,
+                store: this.store,
+                meta: this.meta
+            });
+
+            if (!window.arbor_root) {
+                this.root = window.arbor_root = {};
+                this.once();
+            } else {
+                this.root = window.arbor_root;
+            }
+        }
+
+        create(tag, options) {
+            return document.createElement(tag, options);
+        }
+
+        text(data) {
+            return document.createTextNode(data);
+        }
+
+        append(child, into) {
+            return into.appendChild(child);
+        }
+
+        focus(element) {
+            if (!element) {
+                element = this.querySelector(':scope > ol > li > details > summary');
+            }
+
+            if (this.isElementTag(element, 'details')) {
+                element = element.querySelector(':scope > summary');
+            }
+
+            // agora dá para guardar e recuperar o último foco :)
+            const details = this.getTagParentOrSelf(element, 'details');
+            const id = details?.arbor;
+            localStorage.lastFocusId = id;
+            log("FOCUS!!!!!!!", {id, element, details, lastFocusId: localStorage.lastFocusId}, new Error().stack);
+            setTimeout(() => element?.focus(), 50); // mitigate focus steal by summary
+        }
+
+        once() {
+            const root = this.root;
+
+            root.draggedItem = null;
+            root.ARBOR_DBOPEN_VERSION = 1;
+
+            root.dropTarget = this.create('li');
+            root.dropTarget.className = 'drop-target';
+
+            root.aiAPIKey = localStorage.deepseek_apikey;
+
+            this.events();
+        }
+
+        shortcuts(bindings) {
+            this.root.shorcutRegistry = bindings;
+        }
+
+        css(rules) {
+            const style = this.create("style");
+            rules = this.text(rules);
+            style.appendChild(rules);
+            document.body.appendChild(style);
+        }
+
+        events() {
+
+            const eventRegistry = {
+
+                'navigateUp':          this.navigateUp,
+                'navigateRight':       this.navigateRight,
+                'navigateDown':        this.navigateDown,
+                'navigateLeft':        this.navigateLeft,
+                'addChild':            this.addChild,
+                'addPreviousSibling':  this.addPreviousSibling,
+                'addSibling':          this.addSibling,
+                'edit':                this.edit,
+                'cancel':              this.cancel,
+                'delete':              this.deleteArbor,
+                'toggle':              this.toggle,
+                'open':                this.open,
+                'close':               this.close,
+                'toggleChecked':       this.toggleChecked,
+                'copyUUID':            this.copyUUID,
+                'clickHandler':        this.clickHandler,
+                'onLoadLeaf':          this.onLoadLeaf // should bubble info update
+                
+            };
+
+            const dragHandler = {
+                'dragstart': this.dragHandleDragStart,
+                'dragover':  this.dragHandleDragOver,
+                'dragend':   this.dragHandleDragEnd,
+                'drop':      this.dragHandleDrop
+            };
+
+            const interactionManager = event => this.InteractionManager(event);
+            const bindList = [ 'onkeydown', 'onclick', 'ondragstart', 'ondragover', 'ondragend', 'ondrop' ];
+
+            for (const event of bindList) {
+                document[event] = interactionManager;
+            }
+
+            this.root.eventRegistry = eventRegistry;
+            this.root.dragHandler = dragHandler;
+        }
+
+        InteractionManager(event) {
+            const { target, type } = event;
+            const { key } = event;
+            const { activeElement } = document;
+            const tag = this.getTag(activeElement);
+            const isInput = tag === 'input';
+            
+            log("InteractionManager DragEvent", {type, tag, event, target, activeElement});
+
+            if (isInput) {
+                return;
+            }
+
+            if (type === 'click' && tag === 'summary') {
+                const details = this.getTagParentOrSelf(activeElement, 'details');
+                localStorage.lastFocusId = details?.arbor;
+                // log("CLICOU NUMA SUMMARY", {details});
+            }
+
+            // DragManager
+            if (event instanceof DragEvent) {
+                log("InteractionManager DragEvent", {type, target, event});
+                const isDragHandle = target.matches('span.drag-handle');
+                const isDragStart = isDragHandle && type === 'dragstart';
+                const isDragContinue = type !== 'dragstart';
+                if (isDragStart || isDragContinue) {
+                    const dragHandle = target;
+                    const trigger = this.root.dragHandler[type];
+                    return trigger.bind(this)(event, dragHandle);
+                }
+
+                return;
+            }
+
+            const { eventRegistry, shorcutRegistry } = this.root;
+            const shortcut = this.getKeyShortcut(event);
+            const dispatch = shorcutRegistry?.[shortcut];
+            const trigger = eventRegistry?.[dispatch];
+            const willTrigger = trigger && document.activeElement;
+            log("InteractionManager", {willTrigger,target, event, eventRegistry,shorcutRegistry,shortcut,dispatch,trigger});
+            if (willTrigger) {
+                const { tagName: targetTagName } = target;
+                const targetTag = targetTagName.toLowerCase();
+
+                const isBody = tag === 'body';
+                const isStrong = targetTag === 'strong';
+
+                if (isBody) {
+                    return trigger.bind(this)(event, activeElement);
+                }
+
+                if (isStrong) {
+                    return trigger.bind(this)(event, target);
+                }
+
+                const summary = this.getNearestParentOrChildTag(activeElement, 'summary');
+
+                if (summary) {
+                    event.preventDefault();
+                    return trigger.bind(this)(event, summary);
+                }
+            }
+        }
+
+        getKeyShortcut(event) {
+          const parts = [];
+
+          if (event.ctrlKey) parts.push('Control');
+          if (event.shiftKey) parts.push('Shift');
+          if (event.altKey) parts.push('Alt');
+          if (event.metaKey) parts.push('Meta');
+
+          if (event instanceof KeyboardEvent) {
+            const { key } = event;
+            if (!['Control', 'Shift', 'Alt', 'Meta'].includes(key)) {
+                const pressedKey = key.length === 1 ? key.toUpperCase() : key;
+              parts.push(pressedKey);
+            }
+          } else if (event instanceof MouseEvent) {
+            let buttonName = '';
+            switch (event.button) {
+              case 0: buttonName = 'MouseLeftClick'; break;
+              case 1: buttonName = 'MouseMiddleClick'; break;
+              case 2: buttonName = 'MouseRightClick'; break;
+              default: buttonName = `MouseButton${event.button}`; break;
+            }
+            parts.push(buttonName);
+          }
+
+          const shortcut = parts.join('+');
+          // log('getKeyShortcut', { shortcut, event, trace: new Error().stack });
+          return shortcut;
+        }
+
+        isElementTag(element, tag) {
+            return !!(element && tag && (this.getTag(element) === tag.toLowerCase()));
+        }
+
+        findRenderedArborElement(id) {
+            return [...document.querySelectorAll('details')].find(x => x.arbor === id);
+        }
+
+        getTag(element) {
+            return element.tagName.toLowerCase();
+        }
+
+        getTagParentOrSelf(element, tag) {
+            let parent = element;
+            while (parent) {
+                if (this.isElementTag(parent, tag)) {
+                    return parent;
+                }
+                parent = parent.parentElement;
+            }
+            return null;
+        }
+
+        getNearestParentOrChildTag(element, tag) {
+            return this.getTagParentOrSelf(element, tag) || element.querySelector(tag);
+        }
+
+        getPreviousSiblingOrParent(element) {
+            const sibling = element?.previousElementSibling;
+
+            let summary = null;
+            if (sibling) {
+                summary = sibling?.querySelector(':scope > details > summary');
+
+            } else if (element?.parentElement) {
+                const parentDetails = this.getTagParentOrSelf(element?.parentElement, 'details');
+                
+                if (parentDetails) {
+                    summary = parentDetails?.querySelector(':scope > summary');
+
+                } else {
+                    log("NO VALID PARENT OR SIBLING FOUND", {sibling,parent:element?.parentElement});
+                }
+            } else {
+                log("NO VALID PARENT OR SIBLING FOUND", {sibling,parent:element?.parentElement});
+            }
+
+            return summary;
+        }
+
+        async getAncestors(id) {
+            const ancestors = [id];
+            let parent = id;
+            while (parent) {
+                const current = await this.get(parent);
+                if (current && current.parent) {
+                    parent = current.parent;
+                    ancestors.push(parent);
+                } else {
+                    break;
+                }
+            }
+            return ancestors;
+        }
+
+        getContextId() {
+            // PRECEDENCE:
+            // 1. ELEMENT ID ATTRIBUTE
+            // 2. URL HASH
+            // 3. DEFAULT: ROOT;
+            return (
+                this.getAttribute('id') || 
+                this.resolveUrlHash() || 
+                'root'
+            );
+        }
+
+        resolveUrlHash() {
+            const { hash } = location;
+            return hash.slice(1);
+        }
+
+        goTo(id) {
+            scrollTo(0, 0);
+            localStorage.scrollPosition = 0;
+            location.hash = `#${id}`;
+        }
+
+        async connectedCallback() {
+            this.bootstrap();
+        }
+
+        async disconnectedCallback() {
+            // Clean up when the element is removed
+        }
+
+        async bootstrap() {
+            log("bootstrap", {
+                root: this.root,
+                this: this,
+                id: this.id,
+                database: this.database,
+                store: this.store,
+                meta: this.meta,
+                pristine: this.pristine
+            });
+
+            if (!this.root.baseRoot) {
+                this.root.baseRoot = document.querySelector('body > arbor-root');
+            }
+            
+            this.root.CACHE = this.root.CACHE || {};
+            
+            const cacheKey = `${this.meta}:${this.database}:${this.store}`;
+
+            if (!this.root.CACHE[cacheKey]) {
+                this.root.CACHE[cacheKey] = {};
+                this.root.CACHE[cacheKey].metadb = await this.initMeta();
+                this.root.CACHE[cacheKey].db = await this.initArbor();
+            }
+
+            this.metadb = this.root.CACHE[cacheKey].metadb;
+            this.db = this.root.CACHE[cacheKey].db;
+
+            await this.update();
+            await this.renderPageHeader();
+            this.render();
+        }
+
+        async renderPageHeader() {
+            const isAlreadyRendered = document.querySelector('body > header');
+            if (!isAlreadyRendered) {
+                const root = document.querySelector('body > arbor-root');
+                
+                const previousTheme = localStorage?.arbor_theme;
+                const previousThemeColor = localStorage?.arbor_theme_color;
+                
+                const header = this.create('header');
+                const logo = this.create('h1');
+                const logoAnchor = this.create('a');
+                const menu = this.create('div');
+                const importButton = this.create('button');
+                const exportButton = this.create('button');
+                const themeButton = this.create('button');
+
+                const colorPicker = this.create('input');
+
+                if (previousThemeColor) {
+                    colorPicker.value = previousThemeColor;
+                }
+
+                const themeTree = '🌳 Theme';
+                const themeLight = '🌞 Theme';
+                const themeDark = '🌚 Theme';
+                const isThemeTree = !previousThemeColor;
+                const isThemeLight = previousTheme === 'light' && previousThemeColor;
+                const isThemeDark = previousTheme === 'dark' && previousThemeColor;
+
+                if (isThemeTree) {
+                    themeButton.textContent = themeTree;
+
+                } else if (isThemeLight) {
+                    themeButton.textContent = themeLight;
+
+                } else if (isThemeDark) {
+                    themeButton.textContent = themeDark;
+                }
+
+                if (previousTheme) {
+                    document.documentElement.style.colorScheme = previousTheme;
+                }
+
+                if (previousThemeColor) {
+                    document.documentElement.classList.add('theme');
+                    root.changeBaseColor(previousThemeColor);
+                }
+
+                colorPicker.type = 'color';
+                colorPicker.oninput = e => {
+                    const { value } = e.target;
+                    this.changeBaseColor(value);
+                    log("COLOR:", value);
+                };
+                
+                importButton.onclick = e => this.import();
+                exportButton.onclick = e => this.export();
+                themeButton.onclick = e => this.changeTheme(themeButton);
+
+                importButton.textContent = '📥 Import';
+                importButton.title = 'Import JSON file...';
+                exportButton.textContent = '📤 Export';
+                exportButton.title = 'Export JSON file...';
+                themeButton.title = 'Change theme...';
+                logoAnchor.textContent = `${this.emoji()} Plan`;
+                logoAnchor.href = '#';
+                logo.appendChild(logoAnchor);
+                
+                menu.classList.add('menu');
+                menu.appendChild(importButton);
+                menu.appendChild(exportButton);
+                menu.appendChild(themeButton);
+                menu.appendChild(colorPicker);
+                header.appendChild(logo);
+                header.appendChild(menu);
+                root.before(header);
+            }
+        }
+
+        changeBaseColor(rgb) {
+            const { h, s, l } = this.hexToHSL(rgb);
+            const html = document.documentElement;
+            html.style.setProperty('--arbor-hue', h);
+            html.style.setProperty('--arbor-saturation', s);
+            html.style.setProperty('--arbor-lightness', l);
+            localStorage.arbor_theme_color = rgb;
+        }
+
+        changeTheme(themeButton) {
+            const { textContent } = themeButton;
+            const themeTree = '🌳 Theme';
+            const themeLight = '🌞 Theme';
+            const themeDark = '🌚 Theme';
+            const isThemeTree = textContent === themeTree;
+            const isThemeLight = textContent === themeLight;
+            const isThemeDark = textContent === themeDark;
+
+            if (isThemeTree) {
+                // set to light
+                themeButton.textContent = themeLight;
+                document.documentElement.classList.add('theme');
+                document.documentElement.style.colorScheme = 'light';
+                localStorage.arbor_theme = 'light';
+
+            } else if (isThemeLight) {
+                // set to dark
+                themeButton.textContent = themeDark;
+                document.documentElement.classList.add('theme');
+                document.documentElement.style.colorScheme = 'dark';
+                localStorage.arbor_theme = 'dark';
+
+            } else if (isThemeDark) {
+                // set to tree
+                themeButton.textContent = themeTree;
+                document.documentElement.classList.remove('theme');
+                document.documentElement.style.colorScheme = 'dark';
+                localStorage.arbor_theme = 'dark';
+                delete localStorage.arbor_theme_color;
+            }
+        }
+
+        hexToHSL(hex) {
+          // Remove '#'
+            hex = hex.slice(1);
+
+          // If shorthand notation (e.g., "abc"), convert to full form ("aabbcc")
+          if (hex.length === 3) {
+            let fullHex = '';
+            for (const char of hex) {
+              fullHex += char + char;
+            }
+            hex = fullHex;
+          }
+
+          // Parse the r, g, b values and normalize them to [0, 1].
+          const r = parseInt(hex.substring(0, 2), 16) / 255;
+          const g = parseInt(hex.substring(2, 4), 16) / 255;
+          const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+          // Compute the lightness.
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const l = (max + min) / 2;
+
+          let h, s;
+
+          // If max and min are equal, the color is achromatic.
+          if (max === min) {
+            h = 0;
+            s = 0;
+          } else {
+            const delta = max - min;
+            // Calculate saturation.
+            s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+
+            // Calculate hue.
+            if (max === r) {
+              h = (g - b) / delta + (g < b ? 6 : 0);
+            } else if (max === g) {
+              h = (b - r) / delta + 2;
+            } else if (max === b) {
+              h = (r - g) / delta + 4;
+            }
+            h = h * 60;
+          }
+
+          // Return h, s, l (s and l as percentages).
+          return {
+            h: `${Math.round(h)}deg`,
+            s: `${Math.round(s * 100)}%`,
+            l: `${Math.round(l * 100)}%`
+          };
+        }
+
+        async processParent(arbor, details, updateChildrenOrder = false) {
+
+            if (!arbor || !details) {
+                return;
+            }
+
+            log("updateParents() 1111", {arbor, details});
+            const { id, parent, solved, progress } = arbor;
+            log("updateParents() 2222", {id, parent});
+
+            const children = await this.list(id);
+
+            // AQUI!!! CALCULA O PROGRESSO PONDERADO
+            const totalProgress = this.getWeightedProgress(children);
+            log(`Progresso Total: ${totalProgress}%`);
+
+            log("updateParents() 2222.....55", {totalProgress, oldPROGRESS: progress, parent, children});
+
+            const solvedChildren = children.filter(x => x.progress > 0).length;
+            const unsolvedChildren = children.length - solvedChildren;
+            const childrenIds = children.map(({ id }) => id);
+            const hasChildren = !!children?.length;
+
+            log("updateParents() 4444", {children,solvedChildren,unsolvedChildren,childrenIds,hasChildren});
+
+            const total = children.length;
+            const newProgress = totalProgress;
+            const hasSolvedChildren = hasChildren && solvedChildren > 0;
+            const isSolved = newProgress === 1;
+            const solvedReport = isSolved ? '✔️' : (unsolvedChildren || '');
+            const completedPercentage = Math.floor(newProgress * 100) || (isSolved ? 100 : 0);
+
+            log("updateParents() 44...55", {newProgress,hasSolvedChildren,isSolved,total,completedPercentage,solvedReport});
+
+            const checkpointBox = details.querySelector(':scope > summary > .checkpoint-box');
+
+            arbor.children = childrenIds;
+            arbor.solved = isSolved;
+            arbor.progress = newProgress;
+            arbor.open = total > 0 ? details.open : false;
+
+            details.open = arbor.open;
+
+            log("updateParents() 5555", arbor, details);
+            await this.put(arbor);
+
+            // AQUI, PRECISA ATUALIZAR A ORDEM DOS FILHOS
+            if (updateChildrenOrder) {
+                const ol = details.querySelector(':scope > arbor-root > ol');
+                log("UPDATE ORDER:", {arbor,details,ol});
+                const lis = ol.querySelectorAll(':scope > li');
+
+                for (let order = 1; order < lis.length; order++) {
+                    const index = order - 1;
+                    const item = lis[index];
+                    const id = item.querySelector(':scope > details').arbor;
+                    const arbor = await this.get(id);
+                    arbor.order = order;
+                    await this.put(arbor);
+                }
+            }
+
+            if (hasSolvedChildren) {
+                log("updateParents() aaaaaaa", arbor);
+                checkpointBox.textContent = '';
+                
+                if (completedPercentage === 100) {
+                    log("updateParents() bbbbbbbbbb", arbor);
+                    checkpointBox.classList.remove('progress');
+                    checkpointBox.classList.add('solved');
+                    checkpointBox.textContent = '✔️';
+
+                } else {
+                    log("updateParents() cccccccccc", arbor);
+                    checkpointBox.classList.remove('solved');
+                    checkpointBox.classList.add('progress');
+
+                    const bar = this.create('span');
+                    const text = this.create('span');
+                    bar.classList.add('progressbar');
+                    text.classList.add('percentage');
+                    const percentage = `${completedPercentage}%`;
+                    bar.style.width = percentage;
+                    text.textContent = percentage;
+
+                    checkpointBox.appendChild(bar);
+                    checkpointBox.appendChild(text);
+                }
+            } else {
+                log("updateParents() dddddddddd", arbor);
+                checkpointBox.classList.remove('progress');
+
+                if (isSolved) {
+                    checkpointBox.classList.add('solved');
+                } else {
+                    checkpointBox.classList.remove('solved');
+                }
+
+                checkpointBox.textContent = solvedReport;
+            }
+
+            if (parent !== 'root') {
+                log("updateParents() eeeeeeeeee", {arbor, parent});
+                const nextParent = await this.get(parent);
+                const nextParentElement = await this.getTagParentOrSelf(details.parentElement, 'details');
+                log("updateParents() 666", {nextParent, nextParentElement});
+                await this.processParent(nextParent, nextParentElement, updateChildrenOrder);
+            }
+            log("updateParents() 8888 CLOSE", id);
+        };
+
+        async updateParents(item, details, updateChildrenOrder = false) {
+            const { id, parent } = item;
+
+            log("updateParents()", {id, parent, item, details});
+
+            if (!details) {
+                details = this.findRenderedArborElement(id);
+                if (!details) {
+                    throw new Error(`NO ${id} found rendered`);
+                } else {
+                    log("updateParents() DETAILS FOUND", id, details);
+                }
+            }
+
+            if (parent === 'root' || !details) return;
+
+            const nextParent = await this.get(parent);
+            const nextParentElement = await this.getTagParentOrSelf(details.parentElement, 'details');
+
+            log("updateParents() 000", {nextParent,nextParentElement});
+
+            if (nextParent && nextParentElement) {
+                await this.processParent(nextParent, nextParentElement, updateChildrenOrder);
+            }
+        }
+
+        getWeightedProgress(items) {
+            if (!items.length) return 0;
+
+            let totalWeight = 0;
+            let weightedProgress = 0;
+
+            for (const { id, weight = 1, progress = 0 } of items) {
+                totalWeight += weight;
+                weightedProgress += weight * progress;
+                log("getWeightedProgress DEBUG: ", id, {weight, progress,totalWeight,weightedProgress});
+            }
+
+            const result = weightedProgress / totalWeight;
+
+            if (isNaN(result)) {
+                log("ERROR DUMP: ", {totalWeight, weightedProgress, items});
+                throw new Error("ERROR: NaN WEIGHTED PROGRESS");
+            }
+
+            return result;
+        }
+
+        async update() {
+            const { id } = this;
+            log("UPDATE()", id);
+            const processChildren = async (arbor, children) => {
+                children = children || await this.list(arbor.id);
+
+                let totalWeight = 0;
+                let weightedProgress = 0;
+                for (const child of children) {
+                    let weight = 1;
+                    log(`UPDATE() - CHILD: `, child);
+                    const grandChildren = await this.list(child.id);
+                    const grandChildrenIds = grandChildren.map(({ id }) => id);
+                    const solvedGrandChildren = grandChildren.filter(({ progress }) => progress > 0);
+                    const solvedGrandChildrenCount = solvedGrandChildren.length;
+                    const unsolvedGrandChildren = grandChildren.length - solvedGrandChildrenCount;
+                    const hasGrandChildren = !!grandChildren?.length;
+                    let progress = (
+                        hasGrandChildren ?
+                            this.getWeightedProgress(solvedGrandChildren) :
+                            (child.solved === true) ?
+                                1 :
+                                0
+                    );
+                    let solved = progress === 1;
+                    
+                    if (hasGrandChildren) {
+                        const processedChildren = await processChildren(child, grandChildren);
+                        const grandChildrenWeight = processedChildren.weight;
+                        const grandChildrenProgress = processedChildren.progress;
+                        const grandChildrenSolved = processedChildren.solved;
+                        log(`UPDATE() -- ${child.id} grandChildren WEIGHT: `, grandChildrenWeight);
+                        weight += grandChildrenWeight;
+                        progress = grandChildrenProgress;
+                        solved &&= grandChildrenSolved; // uau perfeito!
+                        child.children = grandChildrenIds;
+                    } else {
+                        child.children = [];
+                        child.open = false;
+                    }
+
+                    child.weight = weight;
+                    child.progress = progress;
+                    child.solved = solved;
+
+                    await this.put(child);
+
+                    totalWeight += child.weight;
+                    weightedProgress += child.weight * child.progress;
+                }
+
+                let totalProgress = 0;
+
+                if (totalWeight !== 0) {
+                    totalProgress = weightedProgress / totalWeight;
+                }
+
+                if (isNaN(totalProgress)) {
+                    log('Error("PROGRESS IS NaN")', {totalProgress,weightedProgress,totalWeight,children});
+                    throw new Error("PROGRESS IS NaN");
+                }
+
+                let totalSolved = totalProgress === 1;
+
+                return { progress: totalProgress, solved: totalSolved, weight:totalWeight };
+            };
+
+            const processedChildren = await processChildren({ id });
+
+            log("UPDATE() TOTAL WEIGHT: ", id, processedChildren);
+        }
+
+        async render() {
+            const isBaseRoot = this.root.baseRoot === this;
+            
+            if (isBaseRoot) {
+                try {
+                    const root = await this.get(this.id);
+                    await this.renderRootInfo(root);
+
+                } catch(err) {
+                    log('render() root not found', this.id, err);
+                }
+            }
+
+            const items = await this.list(this.id);
+            // const items = await this.page(this.id, 1, 10);
+
+            const list = await this.ol(items);
+            this.appendChild(list);
+
+            if (!items.length) {
+                // must render the edit input
+                await this.branch();
+            }
+
+            this.onRenderCallback?.();
+        }
+
+        async renderRootInfo(root) {
+            log('renderRootInfo()', root);
+            const header = document.querySelector('body > header');
+            const info = this.create('div');
+            const actions = this.create('div');
+            info.classList.add('root-info');
+            actions.classList.add('actions');
+            const h1 = this.create('h1');
+            h1.textContent = root.value;
+            info.appendChild(h1);
+
+            root.created = `${new Date(root.created)}`;
+            root.edited = `${new Date(root.edited)}`;
+            root.progress = `${(root.progress * 100).toFixed(2)} %`;
+            root.children = `${root?.children?.join('<br>') || ''}`;
+            delete root.solved;
+            delete root.open;
+            delete root.value;
+
+            for (const key of Object.keys(root)) {
+                const value = root[key];
+                const item = this.create('div');
+                const strong = this.create('strong');
+                const span = this.create('span');
+                strong.textContent = `${key}: `;
+                span.innerHTML = `${value}`;
+                item.classList.add(key);
+                item.appendChild(strong);
+                item.appendChild(span);
+                info.appendChild(item);
+            }
+
+            const addPropertyButton = this.create('button');
+            addPropertyButton.classList.add('add-property');
+            addPropertyButton.textContent = '+ add new property';
+
+            const aiDescriptionButton = this.create('button');
+            aiDescriptionButton.classList.add('ai-desc');
+            aiDescriptionButton.textContent = "AI Report";
+
+            aiDescriptionButton.onclick = e => this.aiDescription(e);
+            addPropertyButton.onclick = e => this.addProperty(e);
+
+            actions.appendChild(aiDescriptionButton);
+            actions.appendChild(addPropertyButton);
+            info.appendChild(actions);
+
+            header.appendChild(info);
+        }
+
+        async aiDescription(event) {
+            // START SPINNER
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = '';
+            button.classList.add('loading');
+            const spinner = this.create('span');
+            spinner.textContent = '⚙️';
+            button.appendChild(spinner);
+            const question = await this.parseAIQuestion();
+            log("QUESTION\n", question);
+            const aiReport = await this.aiRequest(question);
+            // STOP SPINNER
+            button.classList.remove('loading');
+            button.textContent = "AI Report";
+            button.disabled = false;
+            log("ANSWER\n", aiReport);
+            const arbor = await this.get(this.id);
+            arbor.aiReport = aiReport;
+            await this.put(arbor);
+            const field = document.querySelector('.root-info .aiReport span');
+            if (field) {
+                field.textContent = aiReport;
+            } else {
+                location.reload();
+            }
+        }
+
+        async parseAIQuestion() {
+            // [L0][P40] Main Project
+            // [L1][P100] Task 1: Research
+            // [L1][P20] Task 2: Development
+            // [L2][P0] Subtask 2.1: Frontend
+            // [L2][P50] Subtask 2.2: Backend
+            let question = '';
+            let { id } = this;
+
+            const processItem = async (id, level) => {
+                const item = await this.get(id);
+                const progress = Math.floor(item.progress * 100) || (item.solved === true ? 100 : 0);
+                const value = item.value;
+                const children = item?.children ?? [];
+                let question = `[L${level}][P${progress}] ${value}\n`;
+
+                for (const id of children) {
+                    question += await processItem(id, level + 1);
+                }
+
+                return question;
+            };
+
+            question += await processItem(id, 0);
+
+            return question;
+        }
+
+        async addProperty(event) {
+            alert("coming soon...");
+        }
+
+        async onRender(callback) {
+            this.onRenderCallback = callback;
+        }
+
+        async onRecursiveRender(callback) {
+            this.root.onRecursiveRenderCallback = callback;
+        }
+
+        async branch() {
+            const arbor = new Arbor("branch " + new Date().toISOString());
+            log("branch() SHOW INPUT", { arbor, stack: new Error().stack });
+
+            const details = await this.details(arbor);
+            const child = this.li(details);
+            const ol = this.querySelector(':scope > ol');
+
+            if (ol) {
+                ol.appendChild(child);
+
+            } else {
+                throw new Error("NO LIST FOUND ON ROOT", {arbor,details,child,ol});
+            }
+
+            const summary = details.querySelector(':scope > summary');
+            summary.textContent = '';
+            const newInput = this.input();
+            log("branch() ", { newInput });
+            summary.appendChild(newInput);
+            this.focus(newInput);
+        }
+
+        input(arbor) {
+            log("CREATE INPUT", arbor);
+            const input = this.create('input');
+            input.onkeydown = async event => {
+                const { key } = event;
+                log("INPUT KEYD: ", { key });
+                if (key === 'Enter') {
+
+                    // must edit the arbor
+                    // set arbors value from the input value
+
+                    const { value } = input;
+
+                    log("INPUT value: ", { value });
+                    if (value === '') {
+                        return;
+                    }
+                    // get parent details
+                    const summary = this.getTagParentOrSelf(input, 'summary');
+                    const details = summary.parentElement;
+
+                    const directParent = this.getTagParentOrSelf(details.parentElement, 'details');
+                    
+                    let directParentId;
+                    if (directParent) {
+                        directParentId = directParent.arbor;
+                    } else {
+                        const baseRoot = this.root.baseRoot;
+                        directParentId = baseRoot?.id || 'root';
+                    }
+                    log("DIRECT PARENT ID", directParentId);
+
+                    // get arbor id
+                    const id = details.arbor;
+
+                    if (!arbor) {
+                        arbor = new Arbor(value);
+                    }
+
+                    // edit arbor
+                    arbor.value = value;
+                    arbor.parent = directParentId;
+
+                    // NEED TO GET THE ORDER
+                    const li = details.parentElement;
+                    const ol = li.parentElement;
+                    const index = [...ol.children].indexOf(li) + 1;
+                    arbor.order = index;
+
+                    // persist
+                    await this.put(arbor);
+
+                    // replace input with value
+                    input.remove();
+                    const newDetails = await this.details(arbor);
+                    details.after(newDetails);
+                    details.remove();
+                    const newSummary = newDetails.querySelector(':scope > summary');
+                    this.focus(newSummary);
+
+                    // (updateChildrenOrder = true) precisa atualizar a ordem
+                    this.updateParents(arbor, newDetails, true);
+
+                } else if (key === 'Escape') {
+                    return this.cancel(event, input);
+                }
+
+                event.stopPropagation();
+            };
+            input.onblur = async event => {
+                // NÃO APAGA SE FOR O UNICO DA TELA
+                if (input.value === '') {
+                    // se a lista da raiz tiver apenas 1 item, PERSISTE
+                    const { baseRoot } = this.root;
+                    const lis = [...baseRoot.querySelectorAll(':scope > ol > li')];
+                    const onlyOneItem = lis.length === 1;
+                    const hasStarterInput = baseRoot.querySelector(':scope > ol > li > details > summary > input');
+                    const mustPersist = onlyOneItem && hasStarterInput;
+
+                    if (!mustPersist) {
+                        log("DELETE INPUT", {onlyOneItem,hasStarterInput,mustPersist});
+                        const details = this.getTagParentOrSelf(input, 'details');
+                        details?.parentElement?.remove?.();
+                    } else {
+                      log("PERSIST input!", {onlyOneItem,hasStarterInput,mustPersist});
+                    }
+                }
+            };
+            input.placeholder = 'start here now';
+
+            if (arbor?.value) {
+                input.value = arbor.value;
+            }
+
+            return input;
+        }
+
+        async details(item) {
+            const details = this.create('details');
+            const summary = this.create('summary');
+            const h1 = this.create('h1');
+            const strong = this.create('strong');
+            const title = this.create('span');
+            const dragHandle = this.create('span');
+            const checkpointBox = this.create('span');
+            const shortId = item.id.slice(0, 5);
+
+            const children = await this.list(item.id);
+            const total = children.length;
+            const solvedChildren = children.filter(x => x.progress > 0).length;
+            const unsolvedChildren = total - solvedChildren;
+            const hasSolvedChildren = total > 0 && solvedChildren > 0;
+            const isSolved = hasSolvedChildren || item.solved === true;
+            const completed = solvedChildren;
+            // const completedPercentage = Math.floor((completed / total) * 100) || 0;
+            const completedPercentage = Math.floor(item.progress * 100) || (item.solved === true ? 100 : 0);
+            const solvedReport = isSolved ? '✔️' : (unsolvedChildren || '');
+
+            checkpointBox.classList.add('checkpoint-box');
+            log("......details", {
+                item,
+                hasSolvedChildren,
+                children,
+                solvedChildren,
+                unsolvedChildren,
+                isSolved,
+                total,
+                completed,
+                completedPercentage,
+                solvedReport
+            });
+
+            if (hasSolvedChildren) {
+                if (completedPercentage === 100) {
+                    checkpointBox.classList.remove('progress');
+                    checkpointBox.classList.add('solved');
+                    checkpointBox.textContent = '✔️';
+
+                } else {
+                    checkpointBox.classList.add('progress');
+                    checkpointBox.classList.remove('solved');
+
+                    const bar = this.create('span');
+                    const text = this.create('span');
+                    bar.classList.add('progressbar');
+                    text.classList.add('percentage');
+                    const percentage = `${completedPercentage}%`;
+                    bar.style.width = percentage;
+                    text.textContent = percentage;
+
+                    checkpointBox.appendChild(bar);
+                    checkpointBox.appendChild(text);
+                }
+            } else {
+                checkpointBox.classList.remove('progress');
+
+                if (isSolved) {
+                    checkpointBox.classList.add('solved');
+                } else {
+                    checkpointBox.classList.remove('solved');
+                }
+
+                checkpointBox.textContent = solvedReport;
+            }
+
+            strong.textContent = `${shortId}`;
+            strong.title = `${item.id}`;
+
+            title.textContent = item.value;
+
+            h1.appendChild(strong);
+            h1.appendChild(title);
+
+            dragHandle.title = `Drag and drop to reorder`;
+            dragHandle.textContent = '⠿';
+            dragHandle.className = 'drag-handle';
+            dragHandle.draggable = true;
+
+            checkpointBox.onclick = event => {
+                event.stopPropagation();
+                event.preventDefault();
+                return this.toggleChecked(event, summary);
+            };
+
+            summary.onclick = e => e.preventDefault();
+            summary.onkeydown = event => {
+                const { eventRegistry, shorcutRegistry } = this.root;
+                const shortcut = this.getKeyShortcut(event);
+                const dispatch = shorcutRegistry?.[shortcut];
+                const trigger = eventRegistry?.[dispatch];
+                const willTrigger = trigger && document.activeElement;
+                if (willTrigger) {
+                    // prevent open/close issue
+                    event.preventDefault();
+                }
+            };
+
+            summary.appendChild(checkpointBox);
+            summary.appendChild(dragHandle);
+            summary.appendChild(h1);
+
+            details.arbor = item.id;
+            details.open = item.open;
+
+            details.appendChild(summary);
+
+            if (item.open) {
+                // MUST LOAD CHILDREN
+                log("MUST LOAD CHILDREN", item.open);
+                const newRoot = this.create('arbor-root');
+                newRoot.id = item.id;
+                this.root.subloading = this.root.subloading || 0;
+                this.root.subloading += 1;
+                newRoot.onRender(() => {
+                    this.root.subloading -= 1;
+
+                    const isAllLoaded = this.root.subloading === 0;
+                    if (isAllLoaded) {
+                        log("ALL LOADEDDDDDDDDDDDDDDD", this.root.onRecursiveRenderCallback);
+                        this.root.onRecursiveRenderCallback?.();
+                    } else {
+                        log("not all loaded", this.root.subloading);
+                    }
+                });
+                details.appendChild(newRoot); 
+            }
+
+            return details;
+        }
+
+        async ol(items) {
+            const ol = this.create('ol');
+            const { id: parentId = 'root' } = this;
+
+            // log("<<OL>>: ", items, new Error().stack);
+            for (const item of items) {
+                item.parent = parentId;
+                log("<<LI>>: ", item);
+                const content = await this.details(item);
+                const child = this.li(content);
+                ol.appendChild(child);
+            }
+            return ol;
+        }
+
+        li(content) {
+            const li = this.create('li');
+
+            log("LIIIIIIIIIIIIII: ", content);
+            li.appendChild(content);
+            return li;
+        }
+
+        async initMeta() {
+            return this.initDatabase(this.meta, event => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(this.meta)) {
+                    db.createObjectStore(this.meta, { keyPath: 'id' });
+                }
+            });
+        }
+
+        async initArbor() {
+            return this.initDatabase(this.database, event => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(this.store)) {
+                    const store = db.createObjectStore(this.store, { keyPath: 'id' });
+                    store.createIndex("fieldsIndex", "fields", { multiEntry: true });
+                }
+            })
+        }
+
+        async initDatabase(database, onupgradeneeded) {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(database, this.root.ARBOR_DBOPEN_VERSION);
+
+                request.onupgradeneeded = onupgradeneeded;
+
+                request.onsuccess = event => {
+                    resolve(event.target.result);
+                };
+                request.onerror = event => {
+                    reject(`Error opening DB "${database}": ${event.target.error}`);
+                };
+            });
+        }
+
+        idbOptimize(arbor) {
+            const id = arbor.id;
+            const excludedFields = ['id', 'edit'];
+
+            // Build the fields array excluding the id.
+            const fields = [];
+            for (const [key, value] of Object.entries(arbor)) {
+                if (!excludedFields.includes(key)) {
+                    fields.push([key, value]);
+                }
+            }
+
+            // pseudo indexes for multiEntry
+            fields.push(
+                ['parent+order+created', arbor.parent || 'root', arbor.order || Infinity, arbor.created || 0]
+            );
+
+            return { id, fields };
+        }
+
+        idbDeoptimize(arbor) {
+
+            if (!arbor) return null;
+            
+            const result = {};
+
+            if (arbor.id !== undefined) {
+                result.id = arbor.id;
+            }
+
+            const ignoreIndexes = ['parent+order+created'];
+            for (const [key, value] of arbor.fields) {
+                if (!ignoreIndexes.includes(key)) {
+                    result[key] = value;
+                }
+            }
+
+            return result;
+        }
+
+
+        async add(arbor) {
+            return new Promise((resolve, reject) => {
+                if (!this.db) {
+                    reject(`DB NOT READY`);
+                    return;
+                }
+
+                arbor.created = arbor.created || +new Date;
+
+                const db = this.db;
+                const tx = db.transaction([this.store], 'readwrite');
+                const store = tx.objectStore(this.store);
+                const optimized = this.idbOptimize(arbor);
+                log("ADD::::::", { arbor, optimized });
+                const request = store.add(optimized);
+
+                request.onsuccess = () => {
+                    resolve(request.result); // returns the generated id
+                };
+                request.onerror = (event) => {
+                    reject(`Add arbor error: ${event.target.error}`);
+                };
+            });
+        }
+
+        async put(arbor) {
+            return new Promise((resolve, reject) => {
+                if (!this.db) {
+                    reject(`DB NOT READY`);
+                    return;
+                }
+
+                arbor.edited = +new Date;
+
+                const db = this.db;
+                const tx = db.transaction([this.store], 'readwrite');
+                const store = tx.objectStore(this.store);
+                const optimized = this.idbOptimize(arbor);
+                log("put::::::", { arbor, optimized });
+                const request = store.put(optimized);
+
+                request.onsuccess = () => {
+                    resolve(request.result); // returns the generated id
+                };
+                request.onerror = (event) => {
+                    reject(`Add arbor error: ${event.target.error}`);
+                };
+            });
+        }
+
+        async get(id) {
+            return new Promise((resolve, reject) => {
+                if (!this.db) {
+                    reject(`DB NOT READY`);
+                    return;
+                }
+                const db = this.db;
+                const tx = db.transaction([this.store], 'readonly');
+                const store = tx.objectStore(this.store);
+                const request = store.get(id);
+
+                request.onsuccess = () => {
+                    const { result } = request;
+
+                    if (!result) {
+                        log("GET FAIL::::", id);
+                        reject(new Error(`ID: ${id} NOT FOUND`));
+                        return;
+                    }
+                    const deoptimized = this.idbDeoptimize(result);
+                    const arbor = new Arbor(deoptimized);
+                    log("GET::::::", { arbor, deoptimized });
+                    resolve(arbor);
+                };
+                request.onerror = (event) => {
+                    reject(`Get arbor error: ${event.target.error}`);
+                };
+            });
+        }
+
+        async idStartsWith(prefix) {
+            log(`idStartsWith::::::`);
+            return new Promise((resolve, reject) => {
+                if (!this.db) {
+                    reject(`DB NOT READY`);
+                    return;
+                }
+                const db = this.db;
+                const tx = db.transaction([this.store], 'readonly');
+                const store = tx.objectStore(this.store);
+                const range = IDBKeyRange.bound(prefix, prefix + "\uffff");
+                const result = [];
+                const request = store.openCursor(range);
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        const { value } = cursor;
+                        const deoptimized = this.idbDeoptimize(value);
+                        const arbor = new Arbor(deoptimized);
+                        log("idStartsWith::::::", { arbor, deoptimized });
+                        result.push(arbor);
+                        cursor.continue();
+                    } else {
+                        resolve(result);
+                    }
+                };
+            });
+        }
+
+        async delete(id) {
+            return new Promise((resolve, reject) => {
+                if (!this.db) {
+                    reject(`DB NOT READY`);
+                    return;
+                }
+                const db = this.db;
+                const tx = db.transaction([this.store], 'readwrite');
+                const store = tx.objectStore(this.store);
+                const request = store.delete(id);
+
+                request.onsuccess = () => {
+                    log("delete::::::", id);
+                    resolve(id);
+                };
+
+                request.onerror = (event) => {
+                    reject(`Delete arbor error: ${event.target.error}`);
+                };
+            });
+        }
+
+
+        async slowCompleteList() {
+            log(`slowCompleteList::::::`);
+            return new Promise((resolve, reject) => {
+                if (!this.db) {
+                    reject(`DB NOT READY`);
+                    return;
+                }
+                const db = this.db;
+                const tx = db.transaction([this.store], 'readonly');
+                const store = tx.objectStore(this.store);
+                const result = [];
+                const request = store.openCursor();
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        const { value } = cursor;
+                        const deoptimized = this.idbDeoptimize(value);
+                        const arbor = new Arbor(deoptimized);
+                        log("slowCompleteList::::::", { arbor, deoptimized });
+                        result.push(arbor);
+                        cursor.continue();
+                    } else {
+                        resolve(result);
+                    }
+                };
+            });
+        }
+
+        async list(parentId = 'root') {
+            log(`LIST::::::(${parentId})`);
+            return new Promise((resolve, reject) => {
+                if (!this.db) {
+                    reject(`DB NOT READY`);
+                    return;
+                }
+                const db = this.db;
+                const tx = db.transaction([this.store], 'readonly');
+                const store = tx.objectStore(this.store);
+                const index = store.index('fieldsIndex');
+                const lowerBound = ['parent+order+created', parentId];
+                const upperBound = ['parent+order+created', parentId, "\uffff", "\uffff"];
+                const keyRange = IDBKeyRange.bound(lowerBound, upperBound);
+
+                const request = index.getAll(keyRange);
+                const items = [];
+
+                request.onsuccess = (event) => {
+                    const result = event.target.result.map((x, i) => {
+                        const deoptimized = this.idbDeoptimize(x);
+                        const arbor = new Arbor(deoptimized);
+                        arbor.order = i + 1;
+                        return arbor;
+                    });
+
+                    // log(`list result::::::(${parentId})`, { result }, new Error().stack);
+                    resolve(result);
+                };
+
+                request.onerror = (event) => {
+                    reject(`list(${parentId}) error: ${event.target.error}`);
+                };
+            });
+        }
+
+        async page(parentId, pageNumber = 1, pageItemCount = 10) {
+            const skip = (pageNumber - 1) * pageItemCount;
+
+            return new Promise((resolve, reject) => {
+                if (!this.db) {
+                    reject(`DB NOT READY`);
+                    return;
+                }
+                const db = this.db;
+                const tx = db.transaction([this.store], 'readonly');
+                const store = tx.objectStore(this.store);
+                const index = store.index('fieldsIndex');
+                // store.index('createdIndex').openCursor
+                // openCursor(keyRange, direction) - "next" means ascending order
+                // "prev" = descending order
+                // "next" = ascending order
+
+                const lowerBound = ['parent+order+created', parentId];
+                const upperBound = ['parent+order+created', parentId, "\uffff", "\uffff"];
+                const keyRange = IDBKeyRange.bound(lowerBound, upperBound);
+                const request = index.openCursor(keyRange, 'prev');
+
+                let currentIndex = 0;
+                const items = [];
+
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        if (currentIndex >= skip && items.length < pageItemCount) {
+                            const deoptimized = this.idbDeoptimize(cursor.value);
+                            const arbor = new Arbor(deoptimized);
+                            arbor.order = items.length + 1;
+                            items.push(arbor);
+                        }
+                        currentIndex++;
+
+                        // Stop if we've got enough items
+                        if (items.length < pageItemCount) {
+                            cursor.continue();
+                        } else {
+                            log("page1::::::", { items });
+                            resolve(items);
+                        }
+                    } else {
+                        // No more arbors or we reached the end
+                        log("page2::::::", { items });
+                        resolve(items);
+                    }
+                };
+
+                request.onerror = (event) => {
+                    reject(`page() error: ${event.target.error}`);
+                };
+            });
+        }
+
+        async connect(fromId, toId) {
+            const from = await this.get(fromId);
+            const to = await this.get(toId);
+            to.setParent(fromId);
+            from.addChild(toId);
+            return Promise.all([
+                this.put(from),
+                this.put(to)
+            ]);
+        }
+
+        async disconnect(fromId, toId) {
+            const from = await this.get(fromId);
+            const to = await this.get(toId);
+            to.setParent('root');
+            from.deleteChild(toId);
+            return Promise.all([
+                this.put(from),
+                this.put(to)
+            ]);
+        }
+
+        async listMeta() {
+            log(`listMeta::::::`);
+            return new Promise((resolve, reject) => {
+                if (!this.metadb) {
+                    reject(`METADB NOT READY`);
+                    return;
+                }
+                const metadb = this.metadb;
+                const tx = metadb.transaction([this.meta], 'readonly');
+                const store = tx.objectStore(this.meta);
+                const result = [];
+                const request = store.openCursor();
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        const { value } = cursor;
+                        log("listMeta::::::", value);
+                        result.push(value);
+                        cursor.continue();
+                    } else {
+                        resolve(result);
+                    }
+                };
+            });
+        }
+
+        async setMeta(id, value) {
+            return new Promise((resolve, reject) => {
+                if (!this.metadb) {
+                    reject(`METADB NOT READY`);
+                    return;
+                }
+
+                const metadb = this.metadb;
+                const tx = metadb.transaction([this.meta], 'readwrite');
+                const store = tx.objectStore(this.meta);
+                const request = store.put({ id, value });
+
+                request.onsuccess = () => {
+                    const success = request.result === id;
+                    resolve(success);
+                };
+                request.onerror = (event) => {
+                    reject(`setMeta(id: ${id}, value: ${value}) error: ${event.target.error}`);
+                };
+            });
+        }
+
+        async getMeta(id) {
+            return new Promise((resolve, reject) => {
+                const metadb = this.metadb;
+                if (!metadb) {
+                    reject(`METADB NOT READY`);
+                    return;
+                }
+                const tx = metadb.transaction([this.meta], 'readonly');
+                const meta = tx.objectStore(this.meta);
+                const request = meta.get(id);
+
+                request.onsuccess = () => {
+                    const result = request.result;
+                    log(`GET META::::::(${id})`, result);
+                    resolve(result);
+                };
+                request.onerror = (event) => {
+                    reject(`Get META error (${id}): ${event.target.error}`);
+                };
+            });
+        }
+
+        async processImport(incoming) {
+            try {
+                const id = incoming?.id;
+                const local = await this.get(id);
+                const isIncomingNewer = incoming?.edited > local?.edited;
+                
+                log(`processImport ::::::(${id})`, {local,isIncomingNewer,incoming});
+
+                if (isIncomingNewer) {
+                    await this.put(incoming);
+                    return id;
+                } else {
+                    return null;
+                }
+
+            } catch (err) {
+                await this.put(incoming);
+                return incoming.id;
+            }
+        }
+
+        async import() {
+          return new Promise((resolve, reject) => {
+            const input = this.create('input');
+            input.type = "file";
+            input.accept = "application/json";
+            
+            // Listen for file selection
+            input.onchange = (event) => {
+              const file = event.target.files[0];
+              if (!file) {
+                return reject(new Error("No file selected"));
+              }
+              
+              const reader = new FileReader();
+              reader.onload = async () => {
+                try {
+                  // Parse the file contents as JSON
+                  const importedData = JSON.parse(reader.result);
+                  const importedIds = [];
+                  log("Imported JSON:", reader.result.slice(0, 100));
+
+                  for (const incoming of importedData) {
+                    const imported = await this.processImport(incoming);
+                    if (imported) {
+                        importedIds.push(imported);
+                    }
+                  }
+
+                  location.reload(); // reload after import
+                  resolve(importedIds);
+
+                } catch (err) {
+                  log("READER ERROR:", {err, reader});
+                  reject(new Error("Invalid JSON file"));
+                }
+              };
+              
+              reader.onerror = () => reject(reader.error);
+              
+              reader.readAsText(file);
+            };
+
+            // Trigger the file input dialog
+            input.click();
+          });
+        }
+
+
+        async export() {
+            const items = await this.slowCompleteList();
+            const json = JSON.stringify(items, null, 2);
+            log("export...", json.slice(0, 100));
+            const blob = new Blob([json], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+
+            const anchor = this.create("a");
+            anchor.href = url;
+            anchor.download = "arbor.json";
+            anchor.onclick = event => event.stopPropagation();
+            
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+
+            URL.revokeObjectURL(url);
+        }
+
+        async navigateUp(event, activeElement) {
+            log("onArrowUp asdassqww 1111111111");
+            const notSelected = !activeElement || activeElement === document.body;
+            const firstEver = document.querySelector("summary");
+            const lastEver = document.querySelector("body > arbor-root > ol > li:last-of-type summary");
+            const isItASummary = activeElement && activeElement.tagName && activeElement.tagName.toLowerCase() === 'summary';
+
+            log("onArrowUp asdassqww 222222222");
+            if (notSelected) {
+                log("onArrowUp asdassqww 333333333");
+                // must select the very last element of the page
+                const veryLastElement = document.querySelector("body > arbor-root > ol > li:last-of-type summary");
+                this.focus(veryLastElement);
+                return;
+            }
+
+            if (isItASummary) {
+                log("onArrowUp asdassqww 4444444");
+                // must select the previous item
+                let cursor = activeElement; // summary
+                //                        details
+                const details = cursor.parentElement;
+                //                             li
+                const parentLi = details.parentElement;
+                const previousLi = parentLi.previousElementSibling;
+                ////////////// LLOOOOOOOOOOPPPP REQUIRED
+                if (previousLi) {
+                    log("onArrowUp asdassqww 55555555555");
+                    // select previous item
+                    let targetFocus = previousLi.querySelector(':scope > details');
+                    let nextFocus = targetFocus.querySelector(':scope > arbor-root > ol > li:last-of-type > details');
+                    log("onArrowUp ---- targetFocus 5111111", targetFocus);
+                    while (targetFocus?.open && nextFocus) {
+                        //              details
+                        nextFocus = targetFocus.querySelector(':scope > arbor-root > ol > li:last-of-type > details');
+                        if (nextFocus) {
+                            targetFocus = nextFocus;
+                        }
+                        log("onArrowUp targetFocus 54444444", targetFocus);
+                    }
+                    this.focus(targetFocus.querySelector(':scope > summary'));
+
+                } else {
+                    log("onArrowUp asdassqww 66666666666");
+                    // there's no previous item
+                    // must focus the parent
+
+                    //                                   ol          root          details
+                    const parentDetails = parentLi?.parentElement?.parentElement?.parentElement;
+                    const isValidDetails = (
+                        parentDetails &&
+                        parentDetails.tagName &&
+                        parentDetails.tagName.toLowerCase() === 'details'
+                    );
+
+                    if (isValidDetails) {
+                        log("onArrowUp asdassqww 7777777777777");
+                        // parent exists, focus it
+                        //                          li
+                        cursor = parentDetails.parentElement;
+                        cursor = cursor.querySelector(":scope > details > summary");
+                        this.focus(cursor);
+
+                    } else {
+                        log("onArrowUp asdassqww 888888888888");
+                        // parent don't exist, loop navigation
+                        // select very last item
+
+                        // you have to loop while the last select item is open
+                        let veryLastItem = document.querySelector("body > arbor-root > ol > li:last-of-type > details")
+                        let lastVeryLastItem;
+                        while (veryLastItem?.open) {
+                            lastVeryLastItem = veryLastItem;
+                            log("onArrowUp asdassqww 999999999999999", veryLastItem.open, veryLastItem);
+                            veryLastItem = veryLastItem.querySelector(":scope > arbor-root > ol > li:last-of-type > details");
+                        }
+                        log("onArrowUp asdassqww 991111111111", lastVeryLastItem, veryLastItem);
+
+                        if (veryLastItem) {
+                            log("onArrowUp asdassqww 9912222222222", veryLastItem);
+                            let veryLastSummary = veryLastItem.querySelector(":scope > summary");
+                            this.focus(veryLastSummary);
+
+                        } else if (lastVeryLastItem) {
+                            log("onArrowUp asdassqww 9912222222222", lastVeryLastItem);
+                            let veryLastSummary = lastVeryLastItem.querySelector(":scope > summary");
+                            this.focus(veryLastSummary);
+                        } else {
+                            log("onArrowUp asdassqww 9913333333333", lastVeryLastItem, veryLastItem);
+                            // select the very last one
+                            const veryLastOne = document.querySelector("body > arbor-root > ol > li:last-of-type > details > summary");
+                            this.focus(veryLastOne);
+                        }
+                        log("onArrowUp asdassqww AAAAAAAAAAAA");
+                    }
+                }
+            }
+        }
+
+        async navigateRight(event, activeElement) {
+            log('navigateRight',{this:this,event, activeElement});
+            return this.open(event, activeElement);
+        }
+
+        async navigateDown(event, activeElement) {
+            log("onArrowDown aaaaaaa 111111111", {});
+            const notSelected = !activeElement || activeElement === document.body;
+            const lastEver = document.querySelector("body > arbor-root > ol > li:last-of-type summary");
+            const isItASummary = activeElement && activeElement.tagName && activeElement.tagName.toLowerCase() === 'summary';
+
+            log("onArrowDown aaaaaaa 2222222222", { notSelected, lastEver, isItASummary });
+
+            if (notSelected) {
+                log("onArrowDown aaaaaaa 3333333", {});
+                this.focus(document.querySelector("summary"));
+                return;
+            }
+
+            if (isItASummary) {
+                log("onArrowDown aaaaaaa 44444444", {});
+                const details = activeElement.parentElement;
+                const isItOpen = details.open;
+                const id = details.arbor;
+                const cursorLi = details.parentElement;
+                //                   li         ol
+                const lastChildLi = cursorLi.parentElement.querySelector(":scope > li:last-of-type");
+                const firstChild = details.querySelector(":scope > arbor-root > ol > li > details > summary");
+                const isItTheLastOne = cursorLi === lastChildLi;
+
+                log("qqqqq", { isItOpen, details, id });
+                log("onArrowDown aaaaaaa 5555555555", {});
+
+                if (isItOpen && firstChild) {
+                    log("onArrowDown aaaaaaa 666666666", {});
+                    // must select the first child
+                    this.focus(firstChild);
+
+                } else if (isItTheLastOne) {
+                    log("onArrowDown aaaaaaa 777777777", {});
+                    // OR SELECT A HIGHer UNCLE if last one =/
+                    let isItStillTheLastOne = isItTheLastOne;
+                    let lastLiTried = lastChildLi;
+                    // se for o ultimo
+                    while (isItStillTheLastOne) {
+                        log("onArrowDown aaaaaaa 8888888888", { lastLiTried });
+                        // sobe um level e tenta de novo
+                        // ate que alguem não seja o ultimo
+                        //                li           ol          root          details         li
+                        lastLiTried = lastLiTried.parentElement.parentElement.parentElement.parentElement;
+                        const parentLastLiTriedOl = lastLiTried.parentElement;
+
+                        if (parentLastLiTriedOl) {
+                            const contextLastLi = parentLastLiTriedOl.querySelector(":scope > li:last-of-type");
+                            isItStillTheLastOne = lastLiTried === contextLastLi;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (lastLiTried.nextElementSibling) {
+                        log("onArrowDown aaaaaaa 99999999999", { lastLiTried, sib: lastLiTried.nextElementSibling });
+                        this.focus(lastLiTried.nextElementSibling.querySelector(":scope > details > summary"));
+
+                    } else {
+                        log("onArrowDown aaaaaaa AAAAAAAAAAAAAAA", {});
+                        // ou entao vai para o primeiro de todos
+                        this.focus(document.querySelector("summary"));
+                    }
+
+
+                } else {
+                    log("onArrowDown aaaaaaa qqqqqq", {});
+                    // must select the next sibling
+                    let parentLi, nextSiblingLi;
+                    parentLi = details.parentElement
+
+                    while (!nextSiblingLi) {
+                        log("onArrowDown aaaaaaa wwwwwwwwww", {});
+                        nextSiblingLi = parentLi.nextElementSibling;
+
+                        if (nextSiblingLi) {
+                            log("onArrowDown aaaaaaa eeeeeeeee", {});
+                            // select next sibling
+                            const nextFocus = nextSiblingLi.querySelector("summary");
+                            this.focus(nextFocus);
+                        } else {
+                            log("onArrowDown aaaaaaa rrrrrrrrrrrr", {});
+                            // try a higher sibling (uncle)
+                            //            li         ol          root          details         li
+                            parentLi = parentLi?.parentElement?.parentElement?.parentElement?.parentElement;
+                            log("TRY UNCLE: ", parentLi);
+
+                            const isValidUncle = parentLi && parentLi.tagName.toLowerCase() === 'li';
+                            if (!isValidUncle) {
+                                log("onArrowDown aaaaaaa tttttttttttt", {});
+                                // reached the limit, break and select the first one ever
+                                this.focus(document.querySelector("summary"));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        async navigateLeft(event, activeElement) {
+            log('navigateLeft',{this:this,event, activeElement});
+            return this.close(event, activeElement);;
+        }
+
+        async addChild(event, activeElement) {
+            log("addChild 111111111", {event, activeElement});
+            // const summary = this.getNearestParentOrChildTag(activeElement, 'summary');;
+            // const isItASummary = !!summary;
+            const tag = this.getTag(activeElement);
+            const isItASummary = tag === 'summary';
+
+            log("addChild 2222222222", { isItASummary });
+            if (isItASummary) {
+
+                log("addChild 3333333333", {});
+                const details = activeElement.parentElement;
+                details.open = true;
+
+                let childrenElement = details.querySelector(":scope > arbor-root");
+
+                // IF THERE IS ALREADY A CHILDREN ELEMENT
+                // ADD a sibling TO IT (hacky), 
+                // IF NOT, CREATE ONE
+                // AND ADD a sibling TO IT (hacky), 
+
+                // NO!! NO AND NO!!! NO REACT BS NUKE-THEN-RECALCULATE
+                // NO: if the creation also appends is ideal, then always remove and create new (OH NO, REACTIVE BULLSHIT)
+                // NO!! NO AND NO!!! NO REACT BS NUKE-THEN-RECALCULATE
+                
+                const mustCreateChildRoot = !childrenElement;
+                log("addChild mustCreateChildRoot", { childrenElement, mustCreateChildRoot });
+                if (mustCreateChildRoot) {
+                    childrenElement = this.create('arbor-root');
+                    childrenElement.id = details.arbor;
+                    // childrenElement.onRender(async () => {
+                    //     log("ADD CHILD onRecursiveRender", {id:details.arbor});
+                    //     await childrenElement.branch();
+                    // });
+                    details.appendChild(childrenElement);
+
+                    // return;
+                } else {
+                    // O PROBLEMA É QUE O INPUT ESTÁ DIRETO NO LI
+                    // o input tem que estar no summary
+                    // O SUMMARY TEM QUE CANCELAR AS MERDAS DEFAULT SEMPRE!!!!!
+                    // mas o que está dando problema não é o novo criado
+                    const ol = childrenElement.querySelector(":scope > ol");
+                    const details = this.create('details');
+                    const summary = this.create('summary'); // OLHA AQUI!!!!!!!
+                    summary.onclick = e => e.preventDefault();
+                    summary.onkeydown = event => {
+                        const { eventRegistry, shorcutRegistry } = this.root;
+                        const shortcut = this.getKeyShortcut(event);
+                        const dispatch = shorcutRegistry?.[shortcut];
+                        const trigger = eventRegistry?.[dispatch];
+                        const willTrigger = trigger && document.activeElement;
+                        if (willTrigger) {
+                            // prevent open/close issue
+                            event.preventDefault();
+                        }
+                    };
+                    const input = this.input();
+                    summary.appendChild(input);
+                    details.appendChild(summary);
+                    const child = this.li(details);
+                    ol.appendChild(child);
+                    this.focus(input);
+                    log("addChild 3333.5555", { ol, input, child });
+                }
+
+                log("addChild 4444444444", { childrenElement });
+
+            } else {
+                log("addChild 999999999999", {});
+                this.focus(document.querySelector("summary"));
+            }
+            log("addChild 00000000000000", {});
+            
+            event.preventDefault();
+            return false;
+        }
+
+        async addSibling(event, activeElement) {
+            const isItASummary = activeElement && this.isElementTag(activeElement, 'summary');
+            log("addSibling 000", {event, activeElement, isItASummary});
+
+            if (isItASummary) {
+                const details = activeElement.parentElement;
+
+                details.open = false;
+
+                //                            li
+                const parentLi = details.parentElement;
+                //                            ol
+                const parentOl = parentLi.parentElement;
+
+                //                            details
+                const parentDetails = this.parentElement;
+
+                // o input tem que estar no summary
+                const input = this.input();
+                const summary = this.create('summary');
+                summary.appendChild(input);
+                const newDetails = await this.create('details');
+                newDetails.appendChild(summary);
+                const newSiblingLi = this.li(newDetails);
+                log("HHHAA", {input,summary,newDetails,newSiblingLi});
+                parentLi.after(newSiblingLi);
+                this.focus(input);
+
+            } else {
+                this.focus(document.querySelector("summary"));
+            }
+
+            event.preventDefault();
+            return false;
+        }
+
+
+        async addPreviousSibling(event, activeElement) {
+            log('addPreviousSibling',{event, activeElement});
+        }
+
+        async cancel(event, activeElement) {
+            log('cancel',{event, activeElement});
+
+            const tag = this.getTag(activeElement);
+            const isItASummary = tag === 'summary';
+            const isInput = tag === 'input';
+            log("cancel 111111111", {tag});
+
+            if (isInput) {
+                // NÃO IMPORTA SE TEM CONTEÚDO, É PRA CANCELAR
+                // se for um arbor novo, FAZ NADA(antes:deleta o arbor e o li) (NÃO DEVERIA CRIAR ENQUANTO NÃO APERTAR ENTER: SIM, IMPLEMENTADO!)
+                // se for um arbor existente, só refaz o details
+                const input = activeElement;
+
+                // COMO SABER SE É NOVO?
+                // agora você pode checar se já existe :)
+                const details = this.getTagParentOrSelf(input, 'details');
+                const id = details?.arbor || 'root';
+                log("cancel 222 IS INPUT", {input, details, id});
+
+
+                let arbor;
+
+                try {
+                    arbor = await this.get(id);
+
+                } catch (err) {
+                    log("cancel NO ARBOR FOUND", err);
+                }
+
+                if (arbor) {
+                    const newDetails = await this.details(arbor);
+                    details.after(newDetails);
+                    details.remove();
+                    const newSummary = newDetails.querySelector(':scope > summary');
+                    this.focus(newSummary);
+
+                    log("cancel 333 FOCO!!!!!!", newSummary);
+                    // summary.textContent = `${arbor.id.split('-')[0]}: ${value}`;
+                    // summary.focus();
+
+                    await this.updateParents(arbor, newDetails);
+                } else {
+                    const li = this.getTagParentOrSelf(input, 'li');
+                    const nextFocus = this.getPreviousSiblingOrParent(li);
+                    input.blur();
+                    this.focus(nextFocus);
+
+                    log("cancel 333 FOCA PAI OU IRMÃO", nextFocus);
+                }
+
+
+                event.preventDefault();
+                return false;
+            }
+        }
+
+        async edit(event, activeElement) {
+            log('edit',{event, activeElement});
+            const summary = activeElement;
+
+            const isSummary = this.isElementTag(summary, 'summary');
+
+            if (!isSummary) {
+                return;
+            }
+            
+            const title = summary.querySelector(':scope > h1 > span');
+            const details = summary.parentElement;
+            const id = details.arbor;
+
+            const item = await this.get(id);
+
+            const input = this.input(item);
+            
+            title.after(input);
+            title.remove();
+            this.focus(input);
+            input.select();
+        }
+
+        async deleteArbor(event, activeElement) {
+            log('deleteArbor',{event, activeElement});
+            const details = activeElement?.parentElement;
+            const li = details?.parentElement;
+            const nextFocus = this.getPreviousSiblingOrParent(li);
+            const parentDetails = this.getTagParentOrSelf(details.parentElement, 'details');
+            const id = details?.arbor;
+
+            if (id) {
+                await this.delete(id);
+                li.remove();
+                const parent = await this.get(parentDetails.arbor);
+                await this.processParent(parent, parentDetails, true); // update parent directly
+                this.focus(nextFocus);
+            }
+        }
+
+        async toggle(event, activeElement) {
+            const details = activeElement.parentElement;
+            log('toggle',{this:this,event, details, activeElement});
+            if (details.open) {
+                return this.close(event, activeElement);
+            } else {
+                return this.open(event, activeElement);
+            }
+        }
+
+        async clickHandler(event, activeElement) {
+            log('clickHandler',{this:this,event, activeElement});
+            const isCopyButton = activeElement.matches('strong');
+            const isBody = activeElement.matches('body');
+
+            if (isCopyButton) {
+                // return this.copyUUID(event, activeElement);
+                const id = activeElement.title;
+                return this.goTo(id);
+            }
+
+            if (isBody) {
+                // existe input sendo editado?
+                // this.focus(document.querySelector('summary > input'));
+                return;
+            }
+
+            return this.toggle(event, activeElement);
+        }
+
+        async dragHandleDragStart(event, activeElement) {
+                const details = event.target.parentElement;
+            log("dragHandleDragStart", {event, activeElement, details});
+                this.root.draggedItem = details;
+                details.classList.add('dragging');
+                // Some browsers require data to be set for drag events.
+                event.dataTransfer.setData('text/plain', details.arbor);
+                // Optionally, you could set a custom drag image.
+        }
+
+        async dragHandleDragOver(event, activeElement) {
+                event.preventDefault(); // Allow dropping.
+
+                if (activeElement.matches('arbor-root,ol,li')) return;
+                
+                //                        details
+                const details = this.getNearestParentOrChildTag(activeElement, 'details');
+            log("dragHandleDragOver", {event, activeElement, details});
+                //                      li
+                const li = details.parentElement;
+                //                   ol
+                const list = li.parentElement;
+
+                const isDetailsTheDraggedItem = details === this.root.draggedItem; // Ignore the item being dragged.
+                const isValidDrag = !isDetailsTheDraggedItem;
+
+                log("----", { isDetailsTheDraggedItem, details, li, list });
+
+                if (!isValidDrag) return;
+                const rect = li.getBoundingClientRect();
+                const offset = event.clientY - rect.top;
+                const insertBefore = offset < rect.height / 2;
+            log("dragHandleDragOver 22222", {insertBefore});
+                if (insertBefore) {
+            log("dragHandleDragOver 33333", {insertBefore});
+                    if (li.previousSibling !== this.root.dropTarget) {
+            log("dragHandleDragOver 44444", {insertBefore});
+                        log(".insertBefore(", { list, dropTarget: this.root.dropTarget, li });
+                        li.before(this.root.dropTarget);
+                    }
+                } else {
+            log("dragHandleDragOver 55555", {insertBefore});
+                    if (li.nextSibling !== this.root.dropTarget) {
+            log("dragHandleDragOver 66666", {insertBefore});
+                        log(".insertBefore( nextSibling", { list, dropTarget: this.root.dropTarget, nextSibling: li.nextSibling });
+                        li.after(this.root.dropTarget);
+                    }
+                }
+            log("dragHandleDragOver 77777", {insertBefore});
+        }
+
+        async dragHandleDragEnd(event, activeElement) {
+
+                const details = this.getTagParentOrSelf(activeElement, 'details');
+                const { arbor: id } = details;
+
+                const item = await this.get(id);
+
+                let parent;
+                if (item.parent !== 'root') {
+                    parent = await this.get(item.parent);
+                }
+
+            log("dragHandleDragEnd", {event, activeElement,details});
+                //                   span        summary
+                const summary = details.querySelector(':scope > summary');
+                log(">>>>> dragHandleDragEnd", {summary});
+                log(">>>>> dragHandleDragEnd antes CONTAINS(tem que ser TRUE):", summary.classList.contains('dragging'));
+                summary.classList.remove('dragging');
+                log(">>>>> dragHandleDragEnd depois CONTAINS (tem que ser FALSE):", summary.classList.contains('dragging'));
+                //                      summary      details         li
+                const li = this.root.draggedItem.parentElement.parentElement;
+
+                // here, persist order
+                // OLD POSITION PARENT UPDATE
+                // NEW POSITION PARENT UPDATE
+                // - get list
+                // - put order
+                // 
+
+                const oldParent = details.parentElement.parentElement; // ol
+                const newParent = this.root.dropTarget.parentElement; // ol
+                const isSameParent = oldParent === newParent;
+
+                if (!newParent || !oldParent) {
+                    throw new Error("Can't find drop position. NO NEW PARENT FOUND", this.root.dropTarget, {oldParent, newParent});
+                }
+
+                this.root.dropTarget.before(li);
+                this.root.draggedItem = null;
+
+                // precisa atualizar os pais
+
+                // precisa reordenar no db
+                // o index por created não rola sozinho
+                this.root.dropTarget.remove();
+
+                // log("oldPosition", {oldPositionDetails,oldPositionId});
+                // log("newPosition", {newPositionDetails,newPositionId});
+                log("newParent", newParent);
+
+                const newOrder = [
+                    ...newParent.querySelectorAll(':scope > li')
+                ].map(x => {
+                    // log("NEW ORDER", {li: x});
+                    return x.querySelector(':scope > details').arbor
+                });
+
+                log("newOrder", newOrder);
+
+                const newParentDetails = this.getTagParentOrSelf(newParent, 'details');
+                const newParentId = newParentDetails?.arbor || 'root';
+
+                log("parent", { newParentDetails, newParentId });
+
+                for (let i = 0; i < newOrder.length; i++) {
+                    const id = newOrder[i];
+                    const arbor = await this.get(id);
+                    arbor.order = i + 1;
+                    arbor.parent = newParentId;
+                    await this.put(arbor);
+                }
+
+                if (isSameParent) {
+                    log("isSameParent", isSameParent);
+                    return;
+                }
+
+                // UPDATE NEW POSITION
+                log("oldParent", oldParent);
+
+                const oldOrder = [
+                    ...oldParent.querySelectorAll(':scope > li')
+                ].map(x => {
+                    // log("old ORDER", {li: x});
+                    return x.querySelector(':scope > details').arbor
+                });
+
+                log("oldOrder", oldOrder);
+
+                const oldParentDetails = this.getTagParentOrSelf(oldParent, 'details');
+                const oldParentId = oldParentDetails?.arbor || 'root';
+                
+                log("parent", { oldParentDetails, oldParentId });
+
+                for (let i = 0; i < oldOrder.length; i++) {
+                    const id = oldOrder[i];
+                    const arbor = await this.get(id);
+                    arbor.order = i + 1;
+                    arbor.parent = oldParentId;
+                    await this.put(arbor);
+                }
+        }
+
+        async dragHandleDrop(event, activeElement) {
+            event.preventDefault();
+        }
+
+        async open(event, activeElement) {
+            log("open 1111111", {});
+            const notSelected = !activeElement || activeElement === document.body;
+            const isItASummary = activeElement && activeElement.tagName && activeElement.tagName.toLowerCase() === 'summary';
+
+            log("open 222222", { notSelected, isItASummary });
+            if (notSelected) {
+                log("open 333333", {});
+                this.focus(document.querySelector("summary"));
+
+            } else if (isItASummary) {
+                log("open 4444", { activeElement });
+                // if it's closed, open it
+                const details = activeElement.parentElement;
+                const parentId = details.arbor;
+
+                const arbor = await this.get(details.arbor);
+                const hasChildren = !!arbor?.children?.length;
+
+                if (hasChildren && !details.open) {
+                    log("open 555555", { details });
+                    // need to check if is loaded, load if not
+                    // CHECK THE DB IF THERE ARE SOMETHING HERE (BUT YOU NEED ROOT)
+                    const isLoaded = details.querySelector(':scope > arbor-root');
+
+                    if (!isLoaded) {
+                        // there's items to show, but it's not loaded
+                        // so load the root NOT PRISTINE
+                        log("open 66666666", { isLoaded });
+
+                        const childrenElement = this.create('arbor-root');
+                        childrenElement.id = parentId;
+
+                        log("open 77777777", { childrenElement, id: childrenElement.id, pristine: childrenElement.pristine });
+
+                        details.appendChild(childrenElement);
+                    } else {
+                        // there are items to show, and it is already loaded
+                        // so just open (do nothing here)
+                        log("open 7777 just open");
+
+                    }
+
+                    details.open = true;
+                    arbor.open = true;
+                    await this.put(arbor);
+                    log("open 8888888", {});
+
+                } else if (!hasChildren) {
+                    log("open: NO! 8888888 NO CHILDREN", {});
+                    details.open = false;
+                }
+                log("open 9999999", {});
+            }
+        }
+
+        async close(event, activeElement) {
+            const notSelected = !activeElement || activeElement === document.body;
+            const isItASummary = activeElement && activeElement.tagName && activeElement.tagName.toLowerCase() === 'summary';
+
+            if (notSelected) {
+                this.focus(document.querySelector("arbor-root > ol > li:last-of-type summary"));
+
+            } else if (isItASummary) {
+                // if it's open, close it
+                const details = activeElement.parentElement;
+                if (details.open) {
+                    details.open = false;
+
+                    const arbor = await this.get(details.arbor);
+                    arbor.open = false;
+                    await this.put(arbor);
+
+                } else {
+                    // must select parent
+                    // must focus the parent
+
+                    //                                  li             ol          root          details
+                    const parentDetails = details?.parentElement?.parentElement?.parentElement?.parentElement;
+                    const isValidDetails = (
+                        parentDetails &&
+                        parentDetails.tagName &&
+                        parentDetails.tagName.toLowerCase() === 'details'
+                    );
+
+                    if (isValidDetails) {
+                        // parent exists, focus it
+                        //                          li
+                        let cursor = parentDetails.parentElement;
+                        cursor = cursor.querySelector(":scope > details > summary");
+                        this.focus(cursor);
+
+                    } else {
+                        // parent don't exist, does nothing
+                    }
+                }
+            }
+        }
+
+        async toggleChecked(event, activeElement) {
+            const details = activeElement.parentElement;
+            const item = await this.get(details.arbor);
+            const { children = [] } = item;
+            const checkbox = activeElement.querySelector('.checkpoint-box');
+            log('toggleChecked',{this:this,event,checkbox,activeElement});
+            const isChecked = checkbox.textContent === '✔️';
+            const isReady = checkbox.textContent === '';
+
+            if (children.length === 0) {
+                if (isReady) {
+                    checkbox.textContent = '✔️';
+                    checkbox.classList.add('solved');
+
+                    // mark as solved
+                    item.progress = 1;
+                    item.solved = true;
+                    
+                    await this.put(item);
+                    await this.updateParents(item, details);
+
+                } else if (isChecked) {
+                    checkbox.textContent = '';
+                    checkbox.classList.remove('solved');
+
+                    // mark as not solved
+                    item.progress = 0;
+                    item.solved = false;
+                    
+                    await this.put(item);
+                    await this.updateParents(item, details);
+                }
+            }
+            
+            return false;
+        }
+
+        emoji() {
+          // Define ranges for many common single-codepoint emojis.
+          const emojiRanges = [
+            { start: 0x1F600, end: 0x1F64F }, // Emoticons
+            { start: 0x1F300, end: 0x1F5FF }, // Miscellaneous Symbols and Pictographs
+            { start: 0x1F680, end: 0x1F6FF }, // Transport and Map Symbols
+            { start: 0x2600,  end: 0x26FF  }, // Miscellaneous Symbols
+            { start: 0x2700,  end: 0x27BF  }, // Dingbats
+            { start: 0x1F900, end: 0x1F9FF }, // Supplemental Symbols and Pictographs
+            { start: 0x1FA70, end: 0x1FAFF }  // Additional recent emojis
+          ];
+
+          // First, calculate the total count of emojis from our ranges,
+          // and store cumulative counts to later determine which range an index falls into.
+          let totalCount = 0;
+          const cumulativeCounts = [];
+          for (const range of emojiRanges) {
+            const count = range.end - range.start + 1;
+            totalCount += count;
+            cumulativeCounts.push(totalCount);
+          }
+          
+          // Add one for the pirate flag option.
+          const totalOptions = totalCount + 1; // 1824 + 1 = 1825
+
+          // Pick a random index between 0 and totalOptions - 1.
+          const randIndex = Math.floor(Math.random() * totalOptions);
+
+          // If the index equals totalCount (i.e. the last option), return the pirate flag.
+          if (randIndex === totalCount) {
+            // Pirate flag emoji represented as BLACK FLAG + ZWJ + SKULL AND CROSSBONES (with variation selector)
+            return "\u{1F3F4}\u200D\u2620\uFE0F";
+          }
+          
+          // Otherwise, determine in which range the randIndex falls.
+          let rangeIndex = 0;
+          for (const cumulative of cumulativeCounts) {
+            if (randIndex < cumulative) break;
+            rangeIndex++;
+          }
+          
+          // Calculate the offset within the chosen range.
+          const previousCumulative = rangeIndex === 0 ? 0 : cumulativeCounts[rangeIndex - 1];
+          const offset = randIndex - previousCumulative;
+          const codePoint = emojiRanges[rangeIndex].start + offset;
+          return String.fromCodePoint(codePoint);
+        }
+
+        copyUUID(event, element) {
+            const tag = this.getTag(element);
+            const isSummary = tag === 'summary';
+            const isStrong = tag === 'strong';
+            let strong;
+            if (isSummary) {
+                //       summary    details
+                strong = element.querySelector(':scope > h1 > strong');
+            } else if (isStrong) {
+                strong = element;
+            } else {
+                log("ERROR: Not Summary OR Strong: copyUUID(event, element)", {event, element});
+                return;
+            }
+
+            strong.classList.add('glow');
+            setTimeout(() => {
+              strong.classList.remove('glow');
+            }, 1000);
+            return this.copyToClipboard(strong.title);
+        }
+
+        async copyToClipboard(text) {
+            return navigator.clipboard.writeText(text);
+        }
+
+        async aiRequest(question) {
+            if (!this.root.aiAPIKey) {
+                const apiKey = window.prompt("Enter your DeepSeek API key:");
+
+                if (apiKey) {
+                    localStorage.deepseek_apikey = apiKey;
+                    this.root.aiAPIKey = apiKey;
+                } else {
+                    return;
+                }
+            }
+            // const prompt = "You are a planning assistant focused on efficiency. You will be provided with a minimal text format where each line represents a task. Each line begins with two tokens: one for the task's depth formatted as [L<depth>] and one for the task's progress formatted as [P<progress>]. The remainder of the line is the task's title. Based on this, produce a succinct report that briefly summarizes which tasks are complete and which are pending, then provide a short, actionable tip to help move the pending tasks forward. Keep your response to 2-3 concise sentences.";
+            const prompt = "You are a planning assistant with a focus on synthesizing progress into a succinct, human-readable narrative. You will be provided with a minimal text format where each line begins with two meta tokens: [L<depth>] for the task's hierarchy level and [P<progress>] for its progress percentage, followed by the task's title. Analyze the overall progress and produce a brief report that describes what has been accomplished and what remains, without enumerating completed task titles. Instead, provide a contextual summary of the current state and an actionable tip to address pending work. Keep your response to 2-3 concise sentences.";
+            const apiKey = this.root.aiAPIKey;
+            const req = await fetch("https://api.deepseek.com/chat/completions", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [
+                  { role: "system", content: prompt },
+                  { role: "user", content: question }
+                ],
+                stream: false
+              })
+            });
+
+            const result = await req.json();
+
+            return result?.choices?.[0]?.message?.content;
+        }
+    }
+
+    customElements.define('arbor-root', ArborRoot);
+
+    class Arbor {
+        id;
+        value;
+
+        constructor(arbor) {
+            const isPrimitive = arbor !== Object(arbor);
+            if (isPrimitive) {
+                this.id = crypto.randomUUID();
+                this.weight = 1;
+                this.progress = 0;
+                this.value = arbor;
+                this.parent = 'root';
+            } else {
+                const {
+                    id = crypto.randomUUID(),
+                        created = +new Date,
+                        parent = 'root',
+                        weight = 1,
+                        progress = 0,
+                        value,
+                        ...params
+                } = arbor;
+
+                return {
+                    ...params,
+                    id,
+                    created,
+                    parent,
+                    weight,
+                    progress,
+                    value
+                };
+            }
+        }
+
+        setParent(id) {
+            this.parent = id;
+        }
+
+        addChild(id) {
+            if (!this.children) {
+                this.children = new Set();
+            }
+            this.children.add(id);
+        }
+
+        deleteChild(id) {
+            this.children.delete(id);
+        }
+    }
+
+    async function init() {
+        const root = document.createElement('arbor-root');
+
+        root.pristine = true;
+        root.css(ARBOR_STYLES);
+        root.shortcuts(ARBOR_SHORTCUTS);
+        root.onRecursiveRender(async () => {
+            log("init onRecursiveRender scroll to", +localStorage.scrollPosition);
+            scrollTo(0, +localStorage.scrollPosition);
+            const { lastFocusId } = localStorage;
+            log("init onRecursiveRender lastFocusId", lastFocusId);
+            if (lastFocusId) {
+                const found = await root.findRenderedArborElement(lastFocusId);
+
+                if (found) {
+                    log('FOUND lastFocusId: ', found);
+                    root.focus(found);
+                } else {
+                    log('Could not focus lastFocusId: ', lastFocusId, found);
+                }
+            }
+        });
+        document.body.appendChild(root);
+    }
+
+    init();
+
+</script>
