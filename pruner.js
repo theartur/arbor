@@ -1,74 +1,65 @@
-
 const fs = require('fs');
 
-const inputFilePath = './arbor.json';
+const inputFilePath  = './arbor.json';
 const outputFilePath = './arbor_pruned.json';
 
 fs.readFile(inputFilePath, 'utf8', (err, data) => {
     if (err) {
-        console.error('Error reading the file:', err);
+        console.error('Error reading file:', err);
         return;
     }
 
+    let nodes;
     try {
-        const nodes = JSON.parse(data);
+        nodes = JSON.parse(data);
+    } catch (parseErr) {
+        console.error('Error parsing JSON:', parseErr);
+        return;
+    }
 
-        // Create a map of all nodes by their ID for quick lookup
-        const nodeMap = new Map();
-        nodes.forEach(node => {
-            nodeMap.set(node.id, node);
-        });
+    /* ---------- build a lookup for O(1) access ---------- */
+    const nodeMap = new Map();
+    for (const node of nodes) {
+        nodeMap.set(node.id, node);
+    }
 
-        // Identify all valid node IDs (including 'root' as a valid parent)
-        const validNodeIds = new Set();
-        nodes.forEach(node => {
-            if (node.parent === 'root' || nodeMap.has(node.parent)) {
-                validNodeIds.add(node.id);
+    /* ---------- seed the search with root-level children ---------- */
+    const queue = [];
+    for (const node of nodes) {
+        if (node.parent === 'root') queue.push(node.id);
+    }
+
+    /* ---------- breadth-first walk, collecting valid nodes ---------- */
+    const result = new Map();
+    let head = 0;
+
+    while (head < queue.length) {
+        const id = queue[head++];
+        if (result.has(id)) continue;              // already processed
+        const node = nodeMap.get(id);
+        if (!node) continue;                       // skip dangling references
+
+        result.set(id, node);
+
+        const { children } = node;
+        if (Array.isArray(children)) {
+            for (const childId of children) {
+                if (nodeMap.has(childId)) queue.push(childId);
             }
-        });
-
-        // Recursively get all descendants of a given node
-        function getDescendants(nodeId, allNodes) {
-            const descendants = new Set();
-            const queue = [nodeId];
-
-            while (queue.length > 0) {
-                const currentId = queue.shift();
-                const currentNode = allNodes.get(currentId);
-
-                if (currentNode && currentNode.children) {
-                    currentNode.children.forEach(childId => {
-                        if (allNodes.has(childId)) { // Only add if child exists in original data
-                            descendants.add(childId);
-                            queue.push(childId);
-                        }
-                    });
-                }
-            }
-            return descendants;
         }
+    }
 
-        // Collect all nodes that are valid or descendants of valid nodes
-        const nodesToKeep = new Set();
-        validNodeIds.forEach(id => {
-            nodesToKeep.add(id); // Add the valid node itself
-            const descendants = getDescendants(id, nodeMap);
-            descendants.forEach(descendantId => nodesToKeep.add(descendantId));
-        });
-
-        // Filter the original nodes to keep only the valid ones and their descendants
-        const prunedNodes = nodes.filter(node => nodesToKeep.has(node.id));
-
-        // Write the pruned data to a new JSON file
-        fs.writeFile(outputFilePath, JSON.stringify(prunedNodes, null, 2), 'utf8', (err) => {
-            if (err) {
-                console.error('Error writing the file:', err);
+    /* ---------- write output ---------- */
+    fs.writeFile(
+        outputFilePath,
+        JSON.stringify([...result.values()], null, 2),
+        'utf8',
+        writeErr => {
+            if (writeErr) {
+                console.error('Error writing file:', writeErr);
                 return;
             }
             console.log(`Pruned data saved to ${outputFilePath}`);
-        });
-
-    } catch (parseErr) {
-        console.error('Error parsing JSON:', parseErr);
-    }
+        }
+    );
 });
