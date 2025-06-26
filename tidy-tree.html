@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Tree Layout Full Screen</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      background: #f3f4f6;
+    }
+    text {
+      paint-order: stroke;
+      stroke: #ffffff;
+      stroke-width: 2px;
+    }
+    #chart {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="chart"></div>
+  <script type="module">
+    const DATA_URL = "flare.json"; // hierarchical data path
+    const dx = 28; // vertical distance between nodes
+
+    // Initial render
+    draw();
+
+    // Re-render on resize
+    window.addEventListener("resize", () => {
+      if (window.__treeData) draw(window.__treeData);
+    }, { passive: true });
+
+    async function draw(cachedData) {
+      try {
+        const data = cachedData || await fetch(DATA_URL).then(r => r.json());
+        window.__treeData = data;
+
+        const container = document.getElementById("chart");
+        const oldSvg = container.querySelector("svg");
+        if (oldSvg) oldSvg.remove();
+
+        const root = d3.hierarchy(data);
+        const width = Math.max(window.innerWidth, 928); // total breadth
+        const dy = width / (root.height + 1);
+
+        // Tree layout (instead of cluster)
+        const treeLayout = d3.cluster().nodeSize([dx, dy]);
+        root.sort((a, b) => d3.ascending(a.data.name, b.data.name));
+        treeLayout(root);
+
+        // Compute vertical span
+        let x0 = Infinity;
+        let x1 = -Infinity;
+        for (const n of root.descendants()) {
+          if (n.x < x0) x0 = n.x;
+          if (n.x > x1) x1 = n.x;
+        }
+        const height = x1 - x0 + dx * 2;
+
+        // SVG and group (for zoom / pan)
+        const svg = d3.create("svg")
+          .attr("width", "100%")
+          .attr("height", "100%")
+          .attr("viewBox", [-dy / 3, x0 - dx, width, height])
+          .attr("style", "display:block;cursor:grab;background:#f3f4f6;touch-action:none;");
+
+        const g = svg.append("g");
+
+        // Links
+        g.append("g")
+          .attr("fill", "none")
+          .attr("stroke", "#6b7280")
+          .attr("stroke-opacity", 0.4)
+          .attr("stroke-width", 1.5)
+          .selectAll("path")
+          .data(root.links())
+          .join("path")
+          .attr("d", d3.linkHorizontal().x(d => d.y).y(d => d.x));
+
+        // Nodes
+        const node = g.append("g")
+          .attr("stroke-linejoin", "round")
+          .attr("stroke-width", 3)
+          .selectAll("g")
+          .data(root.descendants())
+          .join("g")
+          .attr("transform", d => `translate(${d.y},${d.x})`);
+
+        node.append("circle")
+          .attr("r", 4)
+          .attr("fill", d => d.children ? "#2563eb" : "#93c5fd")
+          .on("mouseover", function () { d3.select(this).attr("stroke", "#111"); })
+          .on("mouseout", function () { d3.select(this).attr("stroke", null); });
+
+        node.append("text")
+          .attr("dy", "0.32em")
+          .attr("x", d => d.children ? -8 : 8)
+          .attr("text-anchor", d => d.children ? "end" : "start")
+          .text(d => d.data.name);
+
+        // Zoom + pan
+        const zoomBehaviour = d3.zoom()
+          .scaleExtent([0.25, 8])
+          .on("start", () => svg.style("cursor", "grabbing"))
+          .on("end", () => svg.style("cursor", "grab"))
+          .on("zoom", ({transform}) => g.attr("transform", transform));
+
+        svg.call(zoomBehaviour);
+        container.appendChild(svg.node());
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>
