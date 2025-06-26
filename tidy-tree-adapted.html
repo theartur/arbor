@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Tidy Tree Layout</title>
+  <title>Tree Layout Full Screen</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <style>
     html, body {
@@ -52,8 +52,8 @@
         const width = Math.max(window.innerWidth, 928); // total breadth
         const dy = width / (root.height + 1);
 
-        // Tree layout
-        const treeLayout = d3.tree().nodeSize([dx, dy]);
+        // Tree layout (instead of cluster)
+        const treeLayout = d3.cluster().nodeSize([dx, dy]);
         root.sort((a, b) => d3.ascending(a.data.name, b.data.name));
         treeLayout(root);
 
