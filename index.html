@@ -55,7 +55,6 @@
             --arbor-saturation: 0%;
             --arbor-lightness: 0%;
             
-            /* theme defaults with proper color theory */
             --bg-color: light-dark(hsl(var(--arbor-hue), calc(var(--arbor-saturation) * 0.2), 95%), hsl(var(--arbor-hue), calc(var(--arbor-saturation) * 0.2), 8%));
             --text-color: light-dark(hsl(var(--arbor-hue), calc(var(--arbor-saturation) * 0.1), 10%), hsl(var(--arbor-hue), calc(var(--arbor-saturation) * 0.1), 95%));
             --primary-color: light-dark(hsl(var(--arbor-hue), var(--arbor-saturation), calc(var(--arbor-lightness) - 5%)), hsl(var(--arbor-hue), var(--arbor-saturation), calc(var(--arbor-lightness) + 10%)));
@@ -89,16 +88,13 @@
 
         html {
             background: var(--arbor-bg);
-            xbackground: linear-gradient(315deg, var(--arbor-clear), var(--arbor-pink));
             color: var(--arbor-clear);
             font: 0.8rem sans-serif;
             padding-bottom: 25vh;
-            xbox-shadow: inset 0 0 50vmin #eee;
         }
 
         body > header {
             min-height: 137px;
-            xbackground: pink;
         }
 
         body > header > h1 {
@@ -406,9 +402,24 @@
             font-size: 1.2rem;
             margin: 0 0 0 35px;
             width: calc(100% - 35px);
-            cursor: pointer;
             font-weight: normal;
             text-shadow: 1px 1px var(--arbor-dark);
+            position: relative;
+        }
+
+        arbor-root summary h1.parent::after {
+            user-select: none;
+            content: '\\2335';
+            position: absolute;
+            right: -10px;
+            top: -12px;
+            padding: 11px;
+            pointer-events: auto;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
         }
 
         arbor-root details[open] > summary {
@@ -423,6 +434,11 @@
             font-weight: bold;
         }
 
+        arbor-root details[open] > summary > h1.parent::after {
+            content: '\\25BE';
+            top: -12px;
+        }
+
         arbor-root summary strong {
             position: relative;
             display: inline-block;
@@ -432,7 +448,6 @@
             text-transform: uppercase;
             width: 45px;
             color: var(--arbor-uuid);
-            xtext-shadow: 1px 1px var(--arbor-clear)
         }
 
         arbor-root summary strong:hover {
@@ -540,11 +555,9 @@
                 element = element.querySelector(':scope > summary');
             }
 
-            // agora dá para guardar e recuperar o último foco :)
             const details = this.getTagParentOrSelf(element, 'details');
             const id = details?.arbor;
             localStorage.lastFocusId = id;
-            log("FOCUS!!!!!!!", {id, element, details, lastFocusId: localStorage.lastFocusId}, new Error().stack);
             setTimeout(() => element?.focus(), 50); // mitigate focus steal by summary
         }
 
@@ -622,8 +635,6 @@
             const tag = this.getTag(activeElement);
             const isInput = tag === 'input';
             
-            log("InteractionManager DragEvent", {type, tag, event, target, activeElement});
-
             if (isInput) {
                 return;
             }
@@ -631,7 +642,6 @@
             if (type === 'click' && tag === 'summary') {
                 const details = this.getTagParentOrSelf(activeElement, 'details');
                 localStorage.lastFocusId = details?.arbor;
-                // log("CLICOU NUMA SUMMARY", {details});
             }
 
             // DragManager
@@ -654,7 +664,7 @@
             const dispatch = shorcutRegistry?.[shortcut];
             const trigger = eventRegistry?.[dispatch];
             const willTrigger = trigger && document.activeElement;
-            log("InteractionManager", {willTrigger,target, event, eventRegistry,shorcutRegistry,shortcut,dispatch,trigger});
+
             if (willTrigger) {
                 const { tagName: targetTagName } = target;
                 const targetTag = targetTagName.toLowerCase();
@@ -705,7 +715,6 @@
           }
 
           const shortcut = parts.join('+');
-          // log('getKeyShortcut', { shortcut, event, trace: new Error().stack });
           return shortcut;
         }
 
@@ -1417,7 +1426,7 @@
             input.onkeydown = async event => {
                 const { key } = event;
                 log("INPUT KEYD: ", { key });
-                if (key === 'Enter') {
+                if (key === 'Enter' || key === 'Tab') {
 
                     // must edit the arbor
                     // set arbors value from the input value
@@ -1471,8 +1480,14 @@
                     const newSummary = newDetails.querySelector(':scope > summary');
                     this.focus(newSummary);
 
-                    // (updateChildrenOrder = true) precisa atualizar a ordem
                     this.updateParents(arbor, newDetails, true);
+
+                    if (key === 'Tab') {
+                        // if has content, commit it, and create a sibling
+                        log('if has content, commit it, and create a sibling');
+                        this.addSibling(event, newSummary);
+                        event.preventDefault();
+                    }
 
                 } else if (key === 'Escape') {
                     return this.cancel(event, input);
@@ -1482,6 +1497,8 @@
             };
             input.onblur = async event => {
                 // NÃO APAGA SE FOR O UNICO DA TELA
+                log("BLUR INPUT", {event});
+
                 if (input.value === '') {
                     // se a lista da raiz tiver apenas 1 item, PERSISTE
                     const { baseRoot } = this.root;
@@ -1490,8 +1507,8 @@
                     const hasStarterInput = baseRoot.querySelector(':scope > ol > li > details > summary > input');
                     const mustPersist = onlyOneItem && hasStarterInput;
 
-                    if (!mustPersist) {
                         log("DELETE INPUT", {onlyOneItem,hasStarterInput,mustPersist});
+                    if (!mustPersist) {
                         const details = this.getTagParentOrSelf(input, 'details');
                         details?.parentElement?.remove?.();
                     } else {
@@ -1583,6 +1600,10 @@
 
             h1.appendChild(strong);
             h1.appendChild(title);
+
+            if (total > 0) {
+                h1.classList.add('parent');
+            }
 
             dragHandle.title = `Drag and drop to reorder`;
             dragHandle.textContent = '⠿';
@@ -1871,8 +1892,8 @@
         }
 
 
-        async slowCompleteList() {
-            log(`slowCompleteList::::::`);
+        async getAllDBItems() {
+            log(`getAllDBItems::::::`);
             return new Promise((resolve, reject) => {
                 if (!this.db) {
                     reject(`DB NOT READY`);
@@ -1889,7 +1910,7 @@
                         const { value } = cursor;
                         const deoptimized = this.idbDeoptimize(value);
                         const arbor = new Arbor(deoptimized);
-                        log("slowCompleteList::::::", { arbor, deoptimized });
+                        log("getAllDBItems::::::", { arbor, deoptimized });
                         result.push(arbor);
                         cursor.continue();
                     } else {
@@ -1975,12 +1996,10 @@
                         if (items.length < pageItemCount) {
                             cursor.continue();
                         } else {
-                            log("page1::::::", { items });
                             resolve(items);
                         }
                     } else {
                         // No more arbors or we reached the end
-                        log("page2::::::", { items });
                         resolve(items);
                     }
                 };
@@ -2153,7 +2172,7 @@
 
 
         async export() {
-            const items = await this.slowCompleteList();
+            const items = await this.getAllDBItems();
             const json = JSON.stringify(items, null, 2);
             log("export...", json.slice(0, 100));
             const blob = new Blob([json], { type: "application/json" });
@@ -2172,15 +2191,12 @@
         }
 
         async navigateUp(event, activeElement) {
-            log("onArrowUp asdassqww 1111111111");
             const notSelected = !activeElement || activeElement === document.body;
             const firstEver = document.querySelector("summary");
             const lastEver = document.querySelector("body > arbor-root > ol > li:last-of-type summary");
             const isItASummary = activeElement && activeElement.tagName && activeElement.tagName.toLowerCase() === 'summary';
 
-            log("onArrowUp asdassqww 222222222");
             if (notSelected) {
-                log("onArrowUp asdassqww 333333333");
                 // must select the very last element of the page
                 const veryLastElement = document.querySelector("body > arbor-root > ol > li:last-of-type summary");
                 this.focus(veryLastElement);
@@ -2188,7 +2204,6 @@
             }
 
             if (isItASummary) {
-                log("onArrowUp asdassqww 4444444");
                 // must select the previous item
                 let cursor = activeElement; // summary
                 //                        details
@@ -2196,25 +2211,21 @@
                 //                             li
                 const parentLi = details.parentElement;
                 const previousLi = parentLi.previousElementSibling;
-                ////////////// LLOOOOOOOOOOPPPP REQUIRED
+
                 if (previousLi) {
-                    log("onArrowUp asdassqww 55555555555");
                     // select previous item
                     let targetFocus = previousLi.querySelector(':scope > details');
                     let nextFocus = targetFocus.querySelector(':scope > arbor-root > ol > li:last-of-type > details');
-                    log("onArrowUp ---- targetFocus 5111111", targetFocus);
                     while (targetFocus?.open && nextFocus) {
                         //              details
                         nextFocus = targetFocus.querySelector(':scope > arbor-root > ol > li:last-of-type > details');
                         if (nextFocus) {
                             targetFocus = nextFocus;
                         }
-                        log("onArrowUp targetFocus 54444444", targetFocus);
                     }
                     this.focus(targetFocus.querySelector(':scope > summary'));
 
                 } else {
-                    log("onArrowUp asdassqww 66666666666");
                     // there's no previous item
                     // must focus the parent
 
@@ -2227,7 +2238,6 @@
                     );
 
                     if (isValidDetails) {
-                        log("onArrowUp asdassqww 7777777777777");
                         // parent exists, focus it
                         //                          li
                         cursor = parentDetails.parentElement;
@@ -2235,7 +2245,6 @@
                         this.focus(cursor);
 
                     } else {
-                        log("onArrowUp asdassqww 888888888888");
                         // parent don't exist, loop navigation
                         // select very last item
 
@@ -2244,53 +2253,42 @@
                         let lastVeryLastItem;
                         while (veryLastItem?.open) {
                             lastVeryLastItem = veryLastItem;
-                            log("onArrowUp asdassqww 999999999999999", veryLastItem.open, veryLastItem);
                             veryLastItem = veryLastItem.querySelector(":scope > arbor-root > ol > li:last-of-type > details");
                         }
-                        log("onArrowUp asdassqww 991111111111", lastVeryLastItem, veryLastItem);
 
                         if (veryLastItem) {
-                            log("onArrowUp asdassqww 9912222222222", veryLastItem);
                             let veryLastSummary = veryLastItem.querySelector(":scope > summary");
                             this.focus(veryLastSummary);
 
                         } else if (lastVeryLastItem) {
-                            log("onArrowUp asdassqww 9912222222222", lastVeryLastItem);
                             let veryLastSummary = lastVeryLastItem.querySelector(":scope > summary");
                             this.focus(veryLastSummary);
                         } else {
-                            log("onArrowUp asdassqww 9913333333333", lastVeryLastItem, veryLastItem);
                             // select the very last one
                             const veryLastOne = document.querySelector("body > arbor-root > ol > li:last-of-type > details > summary");
                             this.focus(veryLastOne);
                         }
-                        log("onArrowUp asdassqww AAAAAAAAAAAA");
                     }
                 }
             }
         }
 
         async navigateRight(event, activeElement) {
-            log('navigateRight',{this:this,event, activeElement});
             return this.open(event, activeElement);
         }
 
         async navigateDown(event, activeElement) {
-            log("onArrowDown aaaaaaa 111111111", {});
             const notSelected = !activeElement || activeElement === document.body;
             const lastEver = document.querySelector("body > arbor-root > ol > li:last-of-type summary");
             const isItASummary = activeElement && activeElement.tagName && activeElement.tagName.toLowerCase() === 'summary';
 
-            log("onArrowDown aaaaaaa 2222222222", { notSelected, lastEver, isItASummary });
 
             if (notSelected) {
-                log("onArrowDown aaaaaaa 3333333", {});
                 this.focus(document.querySelector("summary"));
                 return;
             }
 
             if (isItASummary) {
-                log("onArrowDown aaaaaaa 44444444", {});
                 const details = activeElement.parentElement;
                 const isItOpen = details.open;
                 const id = details.arbor;
@@ -2300,22 +2298,16 @@
                 const firstChild = details.querySelector(":scope > arbor-root > ol > li > details > summary");
                 const isItTheLastOne = cursorLi === lastChildLi;
 
-                log("qqqqq", { isItOpen, details, id });
-                log("onArrowDown aaaaaaa 5555555555", {});
-
                 if (isItOpen && firstChild) {
-                    log("onArrowDown aaaaaaa 666666666", {});
                     // must select the first child
                     this.focus(firstChild);
 
                 } else if (isItTheLastOne) {
-                    log("onArrowDown aaaaaaa 777777777", {});
                     // OR SELECT A HIGHer UNCLE if last one =/
                     let isItStillTheLastOne = isItTheLastOne;
                     let lastLiTried = lastChildLi;
                     // se for o ultimo
                     while (isItStillTheLastOne) {
-                        log("onArrowDown aaaaaaa 8888888888", { lastLiTried });
                         // sobe um level e tenta de novo
                         // ate que alguem não seja o ultimo
                         //                li           ol          root          details         li
@@ -2331,41 +2323,33 @@
                     }
 
                     if (lastLiTried.nextElementSibling) {
-                        log("onArrowDown aaaaaaa 99999999999", { lastLiTried, sib: lastLiTried.nextElementSibling });
                         this.focus(lastLiTried.nextElementSibling.querySelector(":scope > details > summary"));
 
                     } else {
-                        log("onArrowDown aaaaaaa AAAAAAAAAAAAAAA", {});
                         // ou entao vai para o primeiro de todos
                         this.focus(document.querySelector("summary"));
                     }
 
 
                 } else {
-                    log("onArrowDown aaaaaaa qqqqqq", {});
                     // must select the next sibling
                     let parentLi, nextSiblingLi;
                     parentLi = details.parentElement
 
                     while (!nextSiblingLi) {
-                        log("onArrowDown aaaaaaa wwwwwwwwww", {});
                         nextSiblingLi = parentLi.nextElementSibling;
 
                         if (nextSiblingLi) {
-                            log("onArrowDown aaaaaaa eeeeeeeee", {});
                             // select next sibling
                             const nextFocus = nextSiblingLi.querySelector("summary");
                             this.focus(nextFocus);
                         } else {
-                            log("onArrowDown aaaaaaa rrrrrrrrrrrr", {});
                             // try a higher sibling (uncle)
                             //            li         ol          root          details         li
                             parentLi = parentLi?.parentElement?.parentElement?.parentElement?.parentElement;
-                            log("TRY UNCLE: ", parentLi);
 
                             const isValidUncle = parentLi && parentLi.tagName.toLowerCase() === 'li';
                             if (!isValidUncle) {
-                                log("onArrowDown aaaaaaa tttttttttttt", {});
                                 // reached the limit, break and select the first one ever
                                 this.focus(document.querySelector("summary"));
                                 break;
@@ -2377,25 +2361,23 @@
         }
 
         async navigateLeft(event, activeElement) {
-            log('navigateLeft',{this:this,event, activeElement});
             return this.close(event, activeElement);;
         }
 
         async addChild(event, activeElement) {
             log("addChild 111111111", {event, activeElement});
-            // const summary = this.getNearestParentOrChildTag(activeElement, 'summary');;
-            // const isItASummary = !!summary;
             const tag = this.getTag(activeElement);
             const isItASummary = tag === 'summary';
 
-            log("addChild 2222222222", { isItASummary });
             if (isItASummary) {
 
-                log("addChild 3333333333", {});
                 const details = activeElement.parentElement;
                 details.open = true;
 
                 let childrenElement = details.querySelector(":scope > arbor-root");
+
+                const h1 = details.querySelector(":scope > summary > h1");
+                h1.classList.add('parent');
 
                 // IF THERE IS ALREADY A CHILDREN ELEMENT
                 // ADD a sibling TO IT (hacky), 
@@ -2415,14 +2397,11 @@
                     //     log("ADD CHILD onRecursiveRender", {id:details.arbor});
                     //     await childrenElement.branch();
                     // });
+
                     details.appendChild(childrenElement);
 
                     // return;
                 } else {
-                    // O PROBLEMA É QUE O INPUT ESTÁ DIRETO NO LI
-                    // o input tem que estar no summary
-                    // O SUMMARY TEM QUE CANCELAR AS MERDAS DEFAULT SEMPRE!!!!!
-                    // mas o que está dando problema não é o novo criado
                     const ol = childrenElement.querySelector(":scope > ol");
                     const details = this.create('details');
                     const summary = this.create('summary'); // OLHA AQUI!!!!!!!
@@ -2466,7 +2445,7 @@
             if (isItASummary) {
                 const details = activeElement.parentElement;
 
-                details.open = false;
+                // details.open = false;
 
                 //                            li
                 const parentLi = details.parentElement;
@@ -2517,8 +2496,10 @@
                 // COMO SABER SE É NOVO?
                 // agora você pode checar se já existe :)
                 const details = this.getTagParentOrSelf(input, 'details');
+                const parentDetails = this.getTagParentOrSelf(details.parentElement, 'details');
+                const parentId = parentDetails?.arbor || 'root';
                 const id = details?.arbor || 'root';
-                log("cancel 222 IS INPUT", {input, details, id});
+                log("cancel 222 IS INPUT", {input, details, id, parentDetails, parentId});
 
 
                 let arbor;
@@ -2545,8 +2526,26 @@
                 } else {
                     const li = this.getTagParentOrSelf(input, 'li');
                     const nextFocus = this.getPreviousSiblingOrParent(li);
+                    input.value = '';
                     input.blur();
                     this.focus(nextFocus);
+
+                    let parentArbor;
+
+                    try {
+                        parentArbor = await this.get(parentId);
+
+                    } catch (err) {
+                        log("cancel NO PARENT ARBOR FOUND", err);
+                    }
+                    
+                    log({details,parentDetails,parentId,parentArbor,nextFocus,input});
+
+                    const hasChildren = parentArbor?.children.length > 0;
+
+                    if (nextFocus && !hasChildren) {
+                        nextFocus.querySelector(':scope > h1')?.classList?.remove('parent');
+                    }
 
                     log("cancel 333 FOCA PAI OU IRMÃO", nextFocus);
                 }
@@ -2554,6 +2553,19 @@
 
                 event.preventDefault();
                 return false;
+            }
+
+            if (isItASummary) {
+                const self = this.getTagParentOrSelf(activeElement, 'details');
+                const parent = this.getTagParentOrSelf(self.parentElement, 'details');
+
+                if (parent) {
+                    // focus parent
+                    const nextFocus = parent.querySelector(':scope > summary');
+                    nextFocus.focus();
+
+                    return false;
+                }
             }
         }
 
@@ -2601,6 +2613,15 @@
         async toggle(event, activeElement) {
             const details = activeElement.parentElement;
             log('toggle',{this:this,event, details, activeElement});
+
+            
+            const isAllowedHandler = await this.isDropDownAllowedHandler(event, activeElement);
+
+            if (!isAllowedHandler) {
+                log('NO toggle',{isArrowHandler});
+                return;
+            }
+
             if (details.open) {
                 return this.close(event, activeElement);
             } else {
@@ -2625,17 +2646,23 @@
                 return;
             }
 
+            const allowed = await this.isDropDownAllowedHandler(event, activeElement);
+
+            if (!allowed) {
+                return;
+            }
+
             return this.toggle(event, activeElement);
         }
 
         async dragHandleDragStart(event, activeElement) {
-                const details = event.target.parentElement;
+            const details = event.target.parentElement;
             log("dragHandleDragStart", {event, activeElement, details});
-                this.root.draggedItem = details;
-                details.classList.add('dragging');
-                // Some browsers require data to be set for drag events.
-                event.dataTransfer.setData('text/plain', details.arbor);
-                // Optionally, you could set a custom drag image.
+            this.root.draggedItem = details;
+            details.classList.add('dragging');
+            // Some browsers require data to be set for drag events.
+            event.dataTransfer.setData('text/plain', details.arbor);
+            // Optionally, you could set a custom drag image.
         }
 
         async dragHandleDragOver(event, activeElement) {
@@ -2786,18 +2813,36 @@
             event.preventDefault();
         }
 
+        async isDropDownAllowedHandler(event, activeElement) {
+            event.preventDefault();
+
+            const { right } = activeElement.getBoundingClientRect();
+            const clickedRightEdge = right - event.clientX;
+            const ARROW_BOX = 40;
+            const isArrowHandler = clickedRightEdge <= ARROW_BOX;
+            const isSpace = event.code === 'Space';
+            const isArrowRight = event.code === 'ArrowRight';
+            const isArrowLeft = event.code === 'ArrowLeft';
+            const allowed = isArrowHandler || isSpace || isArrowRight || isArrowLeft;
+
+            return allowed;
+        }
+
         async open(event, activeElement) {
-            log("open 1111111", {});
             const notSelected = !activeElement || activeElement === document.body;
             const isItASummary = activeElement && activeElement.tagName && activeElement.tagName.toLowerCase() === 'summary';
 
-            log("open 222222", { notSelected, isItASummary });
             if (notSelected) {
-                log("open 333333", {});
                 this.focus(document.querySelector("summary"));
 
             } else if (isItASummary) {
-                log("open 4444", { activeElement });
+
+                const isAllowedHandler = await this.isDropDownAllowedHandler(event, activeElement);
+
+                if (!isAllowedHandler) {
+                    return;
+                }
+
                 // if it's closed, open it
                 const details = activeElement.parentElement;
                 const parentId = details.arbor;
@@ -2806,39 +2851,29 @@
                 const hasChildren = !!arbor?.children?.length;
 
                 if (hasChildren && !details.open) {
-                    log("open 555555", { details });
-                    // need to check if is loaded, load if not
-                    // CHECK THE DB IF THERE ARE SOMETHING HERE (BUT YOU NEED ROOT)
                     const isLoaded = details.querySelector(':scope > arbor-root');
 
                     if (!isLoaded) {
                         // there's items to show, but it's not loaded
                         // so load the root NOT PRISTINE
-                        log("open 66666666", { isLoaded });
 
                         const childrenElement = this.create('arbor-root');
                         childrenElement.id = parentId;
-
-                        log("open 77777777", { childrenElement, id: childrenElement.id, pristine: childrenElement.pristine });
 
                         details.appendChild(childrenElement);
                     } else {
                         // there are items to show, and it is already loaded
                         // so just open (do nothing here)
-                        log("open 7777 just open");
 
                     }
 
                     details.open = true;
                     arbor.open = true;
                     await this.put(arbor);
-                    log("open 8888888", {});
 
                 } else if (!hasChildren) {
-                    log("open: NO! 8888888 NO CHILDREN", {});
                     details.open = false;
                 }
-                log("open 9999999", {});
             }
         }
 

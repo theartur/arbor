@@ -37,7 +37,7 @@ Arbor takes the concept of checklists to new heights:
 - Offline-First Resilience: Fully functional without an internet connection
 - Open Source: Collaborative development and customization
 - Device Agnostic: Use on any platform
-- 16+ Million Color Themes: Personalize your experience
+- 32+ Million Color Themes: Personalize your experience
 
 
 ### Technology Stack
