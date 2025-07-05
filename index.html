@@ -1035,6 +1035,7 @@
             presentFrame.onclick = event => {
                 presentFrame.close();
                 this.releaseScroll();
+                presentFrame.remove();
             };
             iframe.addEventListener('load', async () => {
                 const data = this.arborToFlare(await this.getAllDBItems());
