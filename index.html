@@ -1007,6 +1007,24 @@
           return root;
         }
 
+        lockScroll() {
+            this.lock_scrollY = window.scrollY;
+            document.body.style.position  = 'fixed';
+            document.body.style.top       = `-${this.lock_scrollY}px`;
+            document.body.style.left      = '0';
+            document.body.style.right     = '0';
+            document.body.style.overflow  = 'hidden';
+        }
+
+        releaseScroll() {
+            document.body.style.position = '';
+            document.body.style.top      = '';
+            document.body.style.left     = '';
+            document.body.style.right    = '';
+            document.body.style.overflow = '';
+            window.scrollTo(0, this.lock_scrollY ?? 0);
+        }
+
         presentModal(src) {
             const presentFrame = this.create('dialog');
             presentFrame.classList.add('present-frame');
@@ -1016,6 +1034,7 @@
             presentFrame.appendChild(iframe);
             presentFrame.onclick = event => {
                 presentFrame.close();
+                this.releaseScroll();
             };
             iframe.addEventListener('load', async () => {
                 const data = this.arborToFlare(await this.getAllDBItems());
@@ -1025,24 +1044,23 @@
                 );
             });
 
+            this.lockScroll();
+            presentFrame.showModal();
+
             return presentFrame;
         }
 
         circlePack() {
-            const frame = this.presentModal('circle-pack.html');
-            frame.showModal();
+            this.presentModal('circle-pack.html');
         }
 
         tidyTree() {
-            const frame = this.presentModal('tidy-tree.html');
-            frame.showModal();
+            this.presentModal('tidy-tree.html');
         }
 
         clusterTree() {
-            const frame = this.presentModal('cluster-tree.html');
-            frame.showModal();
+            this.presentModal('cluster-tree.html');
         }
-
 
         changeBaseColor(rgb) {
             const { h, s, l } = this.hexToHSL(rgb);
