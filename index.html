@@ -1503,12 +1503,18 @@
                     lastDetailsProcessed = details;
                     const childLi = this.li(details);
 
-                    log({bookmark,details, childLi});
-
                     if (bookmark) {
                         bookmark.before(childLi);
-
                     }
+                }
+
+                const unorderedSiblings = [...olParent.querySelectorAll(':scope > li:not(.bookmark):not(:has(input))')].slice(indexLi);
+                for (const li of unorderedSiblings) {
+                    const details = li.querySelector(':scope > details');
+                    const id = details.arbor;
+                    const arbor = await this.get(id);
+                    arbor.order = ++indexLi;
+                    await this.put(arbor);
                 }
 
                 bookmark?.remove();
@@ -2951,7 +2957,6 @@
             let incomingData = '';
             for (const type of event.clipboardData.types) {
               incomingData += event.clipboardData.getData(type);
-              log({type, l:incomingData.length, incomingData});
             }
             const lines = incomingData.split(/\r\n|\n|\r/);
             const result = lines.map(x => x.trim()).filter(Boolean);
