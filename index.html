@@ -400,8 +400,8 @@
         arbor-root summary h1 {
             display: inline-block;
             font-size: 1.2rem;
-            margin: 0 0 0 35px;
-            width: calc(100% - 35px);
+            margin: 0 0 0 25px;
+            width: calc(100% - 25px);
             font-weight: normal;
             text-shadow: 1px 1px var(--arbor-dark);
             position: relative;
@@ -521,14 +521,6 @@
         constructor() {
             super();
             
-            log("CONSTRUCTOR", {
-                parent: this.parent,
-                id: this.id,
-                database: this.database,
-                store: this.store,
-                meta: this.meta
-            });
-
             if (!window.arbor_root) {
                 this.root = window.arbor_root = {};
                 this.once();
@@ -649,7 +641,6 @@
 
             // DragManager
             if (event instanceof DragEvent) {
-                log("InteractionManager DragEvent", {type, target, event});
                 const isDragHandle = target.matches('span.drag-handle');
                 const isDragStart = isDragHandle && type === 'dragstart';
                 const isDragContinue = type !== 'dragstart';
@@ -761,11 +752,7 @@
                 if (parentDetails) {
                     summary = parentDetails?.querySelector(':scope > summary');
 
-                } else {
-                    log("NO VALID PARENT OR SIBLING FOUND", {sibling,parent:element?.parentElement});
                 }
-            } else {
-                log("NO VALID PARENT OR SIBLING FOUND", {sibling,parent:element?.parentElement});
             }
 
             return summary;
@@ -818,16 +805,6 @@
         }
 
         async bootstrap() {
-            log("bootstrap", {
-                root: this.root,
-                this: this,
-                id: this.id,
-                database: this.database,
-                store: this.store,
-                meta: this.meta,
-                pristine: this.pristine
-            });
-
             if (!this.root.baseRoot) {
                 this.root.baseRoot = document.querySelector('body > arbor-root');
             }
@@ -985,10 +962,8 @@
         }
 
         hexToHSL(hex) {
-          // Remove '#'
             hex = hex.slice(1);
 
-          // If shorthand notation (e.g., "abc"), convert to full form ("aabbcc")
           if (hex.length === 3) {
             let fullHex = '';
             for (const char of hex) {
@@ -997,28 +972,23 @@
             hex = fullHex;
           }
 
-          // Parse the r, g, b values and normalize them to [0, 1].
           const r = parseInt(hex.substring(0, 2), 16) / 255;
           const g = parseInt(hex.substring(2, 4), 16) / 255;
           const b = parseInt(hex.substring(4, 6), 16) / 255;
 
-          // Compute the lightness.
           const max = Math.max(r, g, b);
           const min = Math.min(r, g, b);
           const l = (max + min) / 2;
 
           let h, s;
 
-          // If max and min are equal, the color is achromatic.
           if (max === min) {
             h = 0;
             s = 0;
           } else {
             const delta = max - min;
-            // Calculate saturation.
             s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
 
-            // Calculate hue.
             if (max === r) {
               h = (g - b) / delta + (g < b ? 6 : 0);
             } else if (max === g) {
@@ -1029,7 +999,6 @@
             h = h * 60;
           }
 
-          // Return h, s, l (s and l as percentages).
           return {
             h: `${Math.round(h)}deg`,
             s: `${Math.round(s * 100)}%`,
@@ -1043,34 +1012,20 @@
                 return;
             }
 
-            log("updateParents() 1111", {arbor, details});
             const { id, parent, solved, progress } = arbor;
-            log("updateParents() 2222", {id, parent});
 
             const children = await this.list(id);
-
-            // AQUI!!! CALCULA O PROGRESSO PONDERADO
             const totalProgress = this.getWeightedProgress(children);
-            log(`Progresso Total: ${totalProgress}%`);
-
-            log("updateParents() 2222.....55", {totalProgress, oldPROGRESS: progress, parent, children});
-
             const solvedChildren = children.filter(x => x.progress > 0).length;
             const unsolvedChildren = children.length - solvedChildren;
             const childrenIds = children.map(({ id }) => id);
             const hasChildren = !!children?.length;
-
-            log("updateParents() 4444", {children,solvedChildren,unsolvedChildren,childrenIds,hasChildren});
-
             const total = children.length;
             const newProgress = totalProgress;
             const hasSolvedChildren = hasChildren && solvedChildren > 0;
             const isSolved = newProgress === 1;
             const solvedReport = isSolved ? '✔️' : (unsolvedChildren || '');
             const completedPercentage = Math.floor(newProgress * 100) || (isSolved ? 100 : 0);
-
-            log("updateParents() 44...55", {newProgress,hasSolvedChildren,isSolved,total,completedPercentage,solvedReport});
-
             const checkpointBox = details.querySelector(':scope > summary > .checkpoint-box');
 
             arbor.children = childrenIds;
@@ -1079,14 +1034,17 @@
             arbor.open = total > 0 ? details.open : false;
 
             details.open = arbor.open;
+            
+            if (childrenIds.length) {
+                details.querySelector(':scope > summary > h1').classList.add('parent');
+            } else {
+                details.querySelector(':scope > summary > h1').classList.remove('parent');
+            }
 
-            log("updateParents() 5555", arbor, details);
             await this.put(arbor);
 
-            // AQUI, PRECISA ATUALIZAR A ORDEM DOS FILHOS
             if (updateChildrenOrder) {
                 const ol = details.querySelector(':scope > arbor-root > ol');
-                log("UPDATE ORDER:", {arbor,details,ol});
                 const lis = ol.querySelectorAll(':scope > li');
 
                 for (let order = 1; order < lis.length; order++) {
@@ -1100,17 +1058,14 @@
             }
 
             if (hasSolvedChildren) {
-                log("updateParents() aaaaaaa", arbor);
                 checkpointBox.textContent = '';
                 
                 if (completedPercentage === 100) {
-                    log("updateParents() bbbbbbbbbb", arbor);
                     checkpointBox.classList.remove('progress');
                     checkpointBox.classList.add('solved');
                     checkpointBox.textContent = '✔️';
 
                 } else {
-                    log("updateParents() cccccccccc", arbor);
                     checkpointBox.classList.remove('solved');
                     checkpointBox.classList.add('progress');
 
@@ -1126,7 +1081,6 @@
                     checkpointBox.appendChild(text);
                 }
             } else {
-                log("updateParents() dddddddddd", arbor);
                 checkpointBox.classList.remove('progress');
 
                 if (isSolved) {
@@ -1139,26 +1093,23 @@
             }
 
             if (parent !== 'root') {
-                log("updateParents() eeeeeeeeee", {arbor, parent});
-                const nextParent = await this.get(parent);
-                const nextParentElement = await this.getTagParentOrSelf(details.parentElement, 'details');
-                log("updateParents() 666", {nextParent, nextParentElement});
-                await this.processParent(nextParent, nextParentElement, updateChildrenOrder);
+                try {
+                    const nextParent = await this.get(parent);
+                    const nextParentElement = await this.getTagParentOrSelf(details.parentElement, 'details');
+                    await this.processParent(nextParent, nextParentElement, updateChildrenOrder);
+                } catch (err) {
+                    log('ROOT PARENT: ', parent);
+                }
             }
-            log("updateParents() 8888 CLOSE", id);
         };
 
         async updateParents(item, details, updateChildrenOrder = false) {
             const { id, parent } = item;
 
-            log("updateParents()", {id, parent, item, details});
-
             if (!details) {
                 details = this.findRenderedArborElement(id);
                 if (!details) {
                     throw new Error(`NO ${id} found rendered`);
-                } else {
-                    log("updateParents() DETAILS FOUND", id, details);
                 }
             }
 
@@ -1166,8 +1117,6 @@
 
             const nextParent = await this.get(parent);
             const nextParentElement = await this.getTagParentOrSelf(details.parentElement, 'details');
-
-            log("updateParents() 000", {nextParent,nextParentElement});
 
             if (nextParent && nextParentElement) {
                 await this.processParent(nextParent, nextParentElement, updateChildrenOrder);
@@ -1183,7 +1132,6 @@
             for (const { id, weight = 1, progress = 0 } of items) {
                 totalWeight += weight;
                 weightedProgress += weight * progress;
-                log("getWeightedProgress DEBUG: ", id, {weight, progress,totalWeight,weightedProgress});
             }
 
             const result = weightedProgress / totalWeight;
@@ -1198,7 +1146,6 @@
 
         async update() {
             const { id } = this;
-            log("UPDATE()", id);
             const processChildren = async (arbor, children) => {
                 children = children || await this.list(arbor.id);
 
@@ -1206,7 +1153,6 @@
                 let weightedProgress = 0;
                 for (const child of children) {
                     let weight = 1;
-                    log(`UPDATE() - CHILD: `, child);
                     const grandChildren = await this.list(child.id);
                     const grandChildrenIds = grandChildren.map(({ id }) => id);
                     const solvedGrandChildren = grandChildren.filter(({ progress }) => progress > 0);
@@ -1227,7 +1173,6 @@
                         const grandChildrenWeight = processedChildren.weight;
                         const grandChildrenProgress = processedChildren.progress;
                         const grandChildrenSolved = processedChildren.solved;
-                        log(`UPDATE() -- ${child.id} grandChildren WEIGHT: `, grandChildrenWeight);
                         weight += grandChildrenWeight;
                         progress = grandChildrenProgress;
                         solved &&= grandChildrenSolved; // uau perfeito!
@@ -1265,7 +1210,6 @@
 
             const processedChildren = await processChildren({ id });
 
-            log("UPDATE() TOTAL WEIGHT: ", id, processedChildren);
         }
 
         async render() {
@@ -1288,7 +1232,6 @@
             this.appendChild(list);
 
             if (!items.length) {
-                // must render the edit input
                 await this.branch();
             }
 
@@ -1296,7 +1239,6 @@
         }
 
         async renderRootInfo(root) {
-            log('renderRootInfo()', root);
             const header = document.querySelector('body > header');
             const info = this.create('div');
             const actions = this.create('div');
@@ -1346,7 +1288,6 @@
         }
 
         async aiDescription(event) {
-            // START SPINNER
             const button = event.target;
             button.disabled = true;
             button.textContent = '';
@@ -1355,13 +1296,10 @@
             spinner.textContent = '⚙️';
             button.appendChild(spinner);
             const question = await this.parseAIQuestion();
-            log("QUESTION\n", question);
             const aiReport = await this.genAIReport(question);
-            // STOP SPINNER
             button.classList.remove('loading');
             button.textContent = "AI Report";
             button.disabled = false;
-            log("ANSWER\n", aiReport);
             const arbor = await this.get(this.id);
             arbor.aiReport = aiReport;
             await this.put(arbor);
@@ -1415,7 +1353,6 @@
 
         async branch() {
             const arbor = new Arbor("branch " + new Date().toISOString());
-            log("branch() SHOW INPUT", { arbor, stack: new Error().stack });
 
             const details = await this.details(arbor);
             const child = this.li(details);
@@ -1431,29 +1368,25 @@
             const summary = details.querySelector(':scope > summary');
             summary.textContent = '';
             const newInput = this.input();
-            log("branch() ", { newInput });
             summary.appendChild(newInput);
             this.focus(newInput);
         }
 
         input(arbor) {
-            log("CREATE INPUT", arbor);
             const input = this.create('input');
             input.onkeydown = async event => {
-                const { key } = event;
-                log("INPUT KEYD: ", { key });
-                if (key === 'Enter' || key === 'Tab') {
+                event.stopPropagation();
 
-                    // must edit the arbor
-                    // set arbors value from the input value
+                const { key } = event;
+                if (key === 'Enter' || key === 'Tab') {
+                    event.preventDefault();
 
                     const { value } = input;
 
-                    log("INPUT value: ", { value });
                     if (value === '') {
                         return;
                     }
-                    // get parent details
+
                     const summary = this.getTagParentOrSelf(input, 'summary');
                     const details = summary.parentElement;
 
@@ -1466,29 +1399,23 @@
                         const baseRoot = this.root.baseRoot;
                         directParentId = baseRoot?.id || 'root';
                     }
-                    log("DIRECT PARENT ID", directParentId);
 
-                    // get arbor id
                     const id = details.arbor;
 
                     if (!arbor) {
                         arbor = new Arbor(value);
                     }
 
-                    // edit arbor
                     arbor.value = value;
                     arbor.parent = directParentId;
 
-                    // NEED TO GET THE ORDER
                     const li = details.parentElement;
                     const ol = li.parentElement;
                     const index = [...ol.children].indexOf(li) + 1;
                     arbor.order = index;
 
-                    // persist
                     await this.put(arbor);
 
-                    // replace input with value
                     input.remove();
                     const newDetails = await this.details(arbor);
                     details.after(newDetails);
@@ -1499,39 +1426,104 @@
                     this.updateParents(arbor, newDetails, true);
 
                     if (key === 'Tab') {
-                        // if has content, commit it, and create a sibling
-                        log('if has content, commit it, and create a sibling');
                         this.addSibling(event, newSummary);
-                        event.preventDefault();
                     }
 
                 } else if (key === 'Escape') {
                     return this.cancel(event, input);
                 }
-
-                event.stopPropagation();
             };
             input.onblur = async event => {
-                // NÃO APAGA SE FOR O UNICO DA TELA
-                log("BLUR INPUT", {event});
-
                 if (input.value === '') {
-                    // se a lista da raiz tiver apenas 1 item, PERSISTE
                     const { baseRoot } = this.root;
                     const lis = [...baseRoot.querySelectorAll(':scope > ol > li')];
                     const onlyOneItem = lis.length === 1;
                     const hasStarterInput = baseRoot.querySelector(':scope > ol > li > details > summary > input');
                     const mustPersist = onlyOneItem && hasStarterInput;
 
-                        log("DELETE INPUT", {onlyOneItem,hasStarterInput,mustPersist});
                     if (!mustPersist) {
                         const details = this.getTagParentOrSelf(input, 'details');
+                        const parentDetails = this.getTagParentOrSelf(details?.parentElement, 'details');
                         details?.parentElement?.remove?.();
-                    } else {
-                      log("PERSIST input!", {onlyOneItem,hasStarterInput,mustPersist});
+
+                        const parentH1 = parentDetails?.querySelector(':scope > summary > h1.parent');
+                        const innerRootChildren = parentDetails?.querySelectorAll(':scope > arbor-root > ol > li');
+
+                        if (!innerRootChildren.length) {
+                            parentDetails.open = false;
+                            parentH1.classList.remove('parent');
+                        }
                     }
                 }
             };
+
+            input.onpaste = async event => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const summary = this.getTagParentOrSelf(input, 'summary');
+                const details = summary.parentElement;
+
+                const liParent = this.getTagParentOrSelf(details, 'li');
+                const liParentDetail = this.getTagParentOrSelf(liParent, 'details');
+                const liParentDetailId = liParentDetail.arbor;
+                const olParent = this.getTagParentOrSelf(liParent, 'ol');
+
+                let indexLi = [...olParent.children].indexOf(liParent);
+                
+                const directParentId = liParentDetailId ?? this.root.baseRoot?.id ?? 'root';
+
+                const items = this.handlePaste(event);
+
+                if (!items.length) return;
+
+                const bookmark = this.create('li');
+                bookmark.classList.add('bookmark');
+                liParent.before(bookmark);
+
+                liParentDetail.open = true;
+
+                const arbor = await this.get(directParentId);
+                arbor.open = true;
+                await this.put(arbor);
+
+                const newlyCreated = [];
+
+                for (const item of items) {
+                    const arbor = new Arbor(item);
+                    arbor.order = ++indexLi;
+                    arbor.parent = directParentId;
+                    await this.put(arbor);
+                    newlyCreated.push(arbor);
+                }
+                
+                let lastDetailsProcessed;
+                for (const arbor of newlyCreated) {
+                    const details = await this.details(arbor);
+                    lastDetailsProcessed = details;
+                    const childLi = this.li(details);
+
+                    log({bookmark,details, childLi});
+
+                    if (bookmark) {
+                        bookmark.before(childLi);
+
+                    }
+                }
+
+                bookmark?.remove();
+
+                try {
+                    liParent?.remove?.();
+                } catch(e){}
+
+                const newSummary = lastDetailsProcessed.querySelector(':scope > summary');
+                this.focus(newSummary);
+
+                this.updateParents(newlyCreated.pop(), lastDetailsProcessed, true);
+
+            };
+
             input.placeholder = 'start here now';
 
             if (arbor?.value) {
@@ -1558,23 +1550,10 @@
             const hasSolvedChildren = total > 0 && solvedChildren > 0;
             const isSolved = hasSolvedChildren || item.solved === true;
             const completed = solvedChildren;
-            // const completedPercentage = Math.floor((completed / total) * 100) || 0;
             const completedPercentage = Math.floor(item.progress * 100) || (item.solved === true ? 100 : 0);
             const solvedReport = isSolved ? '✔️' : (unsolvedChildren || '');
 
             checkpointBox.classList.add('checkpoint-box');
-            log("......details", {
-                item,
-                hasSolvedChildren,
-                children,
-                solvedChildren,
-                unsolvedChildren,
-                isSolved,
-                total,
-                completed,
-                completedPercentage,
-                solvedReport
-            });
 
             if (hasSolvedChildren) {
                 if (completedPercentage === 100) {
@@ -1609,7 +1588,7 @@
                 checkpointBox.textContent = solvedReport;
             }
 
-            strong.textContent = `${shortId}`;
+            strong.textContent = ` ${shortId} `;
             strong.title = `${item.id}`;
 
             title.textContent = item.value;
@@ -1640,7 +1619,6 @@
                 const trigger = eventRegistry?.[dispatch];
                 const willTrigger = trigger && document.activeElement;
                 if (willTrigger) {
-                    // prevent open/close issue
                     event.preventDefault();
                 }
             };
@@ -1655,8 +1633,6 @@
             details.appendChild(summary);
 
             if (item.open) {
-                // MUST LOAD CHILDREN
-                log("MUST LOAD CHILDREN", item.open);
                 const newRoot = this.create('arbor-root');
                 newRoot.id = item.id;
                 this.root.subloading = this.root.subloading || 0;
@@ -1666,10 +1642,7 @@
 
                     const isAllLoaded = this.root.subloading === 0;
                     if (isAllLoaded) {
-                        log("ALL LOADEDDDDDDDDDDDDDDD", this.root.onRecursiveRenderCallback);
                         this.root.onRecursiveRenderCallback?.();
-                    } else {
-                        log("not all loaded", this.root.subloading);
                     }
                 });
                 details.appendChild(newRoot); 
@@ -1682,10 +1655,8 @@
             const ol = this.create('ol');
             const { id: parentId = 'root' } = this;
 
-            // log("<<OL>>: ", items, new Error().stack);
             for (const item of items) {
                 item.parent = parentId;
-                log("<<LI>>: ", item);
                 const content = await this.details(item);
                 const child = this.li(content);
                 ol.appendChild(child);
@@ -1696,7 +1667,6 @@
         li(content) {
             const li = this.create('li');
 
-            log("LIIIIIIIIIIIIII: ", content);
             li.appendChild(content);
             return li;
         }
@@ -1739,7 +1709,6 @@
             const id = arbor.id;
             const excludedFields = ['id', 'edit'];
 
-            // Build the fields array excluding the id.
             const fields = [];
             for (const [key, value] of Object.entries(arbor)) {
                 if (!excludedFields.includes(key)) {
@@ -1789,7 +1758,6 @@
                 const tx = db.transaction([this.store], 'readwrite');
                 const store = tx.objectStore(this.store);
                 const optimized = this.idbOptimize(arbor);
-                log("ADD::::::", { arbor, optimized });
                 const request = store.add(optimized);
 
                 request.onsuccess = () => {
@@ -1814,7 +1782,6 @@
                 const tx = db.transaction([this.store], 'readwrite');
                 const store = tx.objectStore(this.store);
                 const optimized = this.idbOptimize(arbor);
-                log("put::::::", { arbor, optimized });
                 const request = store.put(optimized);
 
                 request.onsuccess = () => {
@@ -1847,7 +1814,6 @@
                     }
                     const deoptimized = this.idbDeoptimize(result);
                     const arbor = new Arbor(deoptimized);
-                    log("GET::::::", { arbor, deoptimized });
                     resolve(arbor);
                 };
                 request.onerror = (event) => {
@@ -1857,7 +1823,6 @@
         }
 
         async idStartsWith(prefix) {
-            log(`idStartsWith::::::`);
             return new Promise((resolve, reject) => {
                 if (!this.db) {
                     reject(`DB NOT READY`);
@@ -1875,7 +1840,6 @@
                         const { value } = cursor;
                         const deoptimized = this.idbDeoptimize(value);
                         const arbor = new Arbor(deoptimized);
-                        log("idStartsWith::::::", { arbor, deoptimized });
                         result.push(arbor);
                         cursor.continue();
                     } else {
@@ -1897,7 +1861,6 @@
                 const request = store.delete(id);
 
                 request.onsuccess = () => {
-                    log("delete::::::", id);
                     resolve(id);
                 };
 
@@ -1909,7 +1872,6 @@
 
 
         async getAllDBItems() {
-            log(`getAllDBItems::::::`);
             return new Promise((resolve, reject) => {
                 if (!this.db) {
                     reject(`DB NOT READY`);
@@ -1926,7 +1888,6 @@
                         const { value } = cursor;
                         const deoptimized = this.idbDeoptimize(value);
                         const arbor = new Arbor(deoptimized);
-                        log("getAllDBItems::::::", { arbor, deoptimized });
                         result.push(arbor);
                         cursor.continue();
                     } else {
@@ -1937,7 +1898,6 @@
         }
 
         async list(parentId = 'root') {
-            log(`LIST::::::(${parentId})`);
             return new Promise((resolve, reject) => {
                 if (!this.db) {
                     reject(`DB NOT READY`);
@@ -1962,7 +1922,6 @@
                         return arbor;
                     });
 
-                    // log(`list result::::::(${parentId})`, { result }, new Error().stack);
                     resolve(result);
                 };
 
@@ -2049,7 +2008,6 @@
         }
 
         async listMeta() {
-            log(`listMeta::::::`);
             return new Promise((resolve, reject) => {
                 if (!this.metadb) {
                     reject(`METADB NOT READY`);
@@ -2064,7 +2022,6 @@
                     const cursor = event.target.result;
                     if (cursor) {
                         const { value } = cursor;
-                        log("listMeta::::::", value);
                         result.push(value);
                         cursor.continue();
                     } else {
@@ -2109,7 +2066,6 @@
 
                 request.onsuccess = () => {
                     const result = request.result;
-                    log(`GET META::::::(${id})`, result);
                     resolve(result);
                 };
                 request.onerror = (event) => {
@@ -2124,8 +2080,6 @@
                 const local = await this.get(id);
                 const isIncomingNewer = incoming?.edited > local?.edited;
                 
-                log(`processImport ::::::(${id})`, {local,isIncomingNewer,incoming});
-
                 if (isIncomingNewer) {
                     await this.put(incoming);
                     return id;
@@ -2145,7 +2099,6 @@
             input.type = "file";
             input.accept = "application/json";
             
-            // Listen for file selection
             input.onchange = (event) => {
               const file = event.target.files[0];
               if (!file) {
@@ -2155,7 +2108,6 @@
               const reader = new FileReader();
               reader.onload = async () => {
                 try {
-                  // Parse the file contents as JSON
                   const importedData = JSON.parse(reader.result);
                   const importedIds = [];
                   log("Imported JSON:", reader.result.slice(0, 100));
@@ -2167,7 +2119,7 @@
                     }
                   }
 
-                  location.reload(); // reload after import
+                  location.reload();
                   resolve(importedIds);
 
                 } catch (err) {
@@ -2190,7 +2142,6 @@
         async export() {
             const items = await this.getAllDBItems();
             const json = JSON.stringify(items, null, 2);
-            log("export...", json.slice(0, 100));
             const blob = new Blob([json], { type: "application/json" });
             const url = URL.createObjectURL(blob);
 
@@ -2319,13 +2270,9 @@
                     this.focus(firstChild);
 
                 } else if (isItTheLastOne) {
-                    // OR SELECT A HIGHer UNCLE if last one =/
                     let isItStillTheLastOne = isItTheLastOne;
                     let lastLiTried = lastChildLi;
-                    // se for o ultimo
                     while (isItStillTheLastOne) {
-                        // sobe um level e tenta de novo
-                        // ate que alguem não seja o ultimo
                         //                li           ol          root          details         li
                         lastLiTried = lastLiTried.parentElement.parentElement.parentElement.parentElement;
                         const parentLastLiTriedOl = lastLiTried.parentElement;
@@ -2342,7 +2289,6 @@
                         this.focus(lastLiTried.nextElementSibling.querySelector(":scope > details > summary"));
 
                     } else {
-                        // ou entao vai para o primeiro de todos
                         this.focus(document.querySelector("summary"));
                     }
 
@@ -2381,7 +2327,6 @@
         }
 
         async addChild(event, activeElement) {
-            log("addChild 111111111", {event, activeElement});
             const tag = this.getTag(activeElement);
             const isItASummary = tag === 'summary';
 
@@ -2395,17 +2340,7 @@
                 const h1 = details.querySelector(":scope > summary > h1");
                 h1.classList.add('parent');
 
-                // IF THERE IS ALREADY A CHILDREN ELEMENT
-                // ADD a sibling TO IT (hacky), 
-                // IF NOT, CREATE ONE
-                // AND ADD a sibling TO IT (hacky), 
-
-                // NO!! NO AND NO!!! NO REACT BS NUKE-THEN-RECALCULATE
-                // NO: if the creation also appends is ideal, then always remove and create new (OH NO, REACTIVE BULLSHIT)
-                // NO!! NO AND NO!!! NO REACT BS NUKE-THEN-RECALCULATE
-                
                 const mustCreateChildRoot = !childrenElement;
-                log("addChild mustCreateChildRoot", { childrenElement, mustCreateChildRoot });
                 if (mustCreateChildRoot) {
                     childrenElement = this.create('arbor-root');
                     childrenElement.id = details.arbor;
@@ -2416,7 +2351,6 @@
 
                     details.appendChild(childrenElement);
 
-                    // return;
                 } else {
                     const ol = childrenElement.querySelector(":scope > ol");
                     const details = this.create('details');
@@ -2439,16 +2373,11 @@
                     const child = this.li(details);
                     ol.appendChild(child);
                     this.focus(input);
-                    log("addChild 3333.5555", { ol, input, child });
                 }
 
-                log("addChild 4444444444", { childrenElement });
-
             } else {
-                log("addChild 999999999999", {});
                 this.focus(document.querySelector("summary"));
             }
-            log("addChild 00000000000000", {});
             
             event.preventDefault();
             return false;
@@ -2456,7 +2385,6 @@
 
         async addSibling(event, activeElement) {
             const isItASummary = activeElement && this.isElementTag(activeElement, 'summary');
-            log("addSibling 000", {event, activeElement, isItASummary});
 
             if (isItASummary) {
                 const details = activeElement.parentElement;
@@ -2478,7 +2406,6 @@
                 const newDetails = await this.create('details');
                 newDetails.appendChild(summary);
                 const newSiblingLi = this.li(newDetails);
-                log("HHHAA", {input,summary,newDetails,newSiblingLi});
                 parentLi.after(newSiblingLi);
                 this.focus(input);
 
@@ -2496,27 +2423,18 @@
         }
 
         async cancel(event, activeElement) {
-            log('cancel',{event, activeElement});
 
             const tag = this.getTag(activeElement);
             const isItASummary = tag === 'summary';
             const isInput = tag === 'input';
-            log("cancel 111111111", {tag});
 
             if (isInput) {
-                // NÃO IMPORTA SE TEM CONTEÚDO, É PRA CANCELAR
-                // se for um arbor novo, FAZ NADA(antes:deleta o arbor e o li) (NÃO DEVERIA CRIAR ENQUANTO NÃO APERTAR ENTER: SIM, IMPLEMENTADO!)
-                // se for um arbor existente, só refaz o details
                 const input = activeElement;
 
-                // COMO SABER SE É NOVO?
-                // agora você pode checar se já existe :)
                 const details = this.getTagParentOrSelf(input, 'details');
                 const parentDetails = this.getTagParentOrSelf(details.parentElement, 'details');
                 const parentId = parentDetails?.arbor || 'root';
                 const id = details?.arbor || 'root';
-                log("cancel 222 IS INPUT", {input, details, id, parentDetails, parentId});
-
 
                 let arbor;
 
@@ -2533,12 +2451,8 @@
                     details.remove();
                     const newSummary = newDetails.querySelector(':scope > summary');
                     this.focus(newSummary);
-
-                    log("cancel 333 FOCO!!!!!!", newSummary);
-                    // summary.textContent = `${arbor.id.split('-')[0]}: ${value}`;
-                    // summary.focus();
-
                     await this.updateParents(arbor, newDetails);
+
                 } else {
                     const li = this.getTagParentOrSelf(input, 'li');
                     const nextFocus = this.getPreviousSiblingOrParent(li);
@@ -2562,10 +2476,7 @@
                     if (nextFocus && !hasChildren) {
                         nextFocus.querySelector(':scope > h1')?.classList?.remove('parent');
                     }
-
-                    log("cancel 333 FOCA PAI OU IRMÃO", nextFocus);
                 }
-
 
                 event.preventDefault();
                 return false;
@@ -2576,7 +2487,6 @@
                 const parent = this.getTagParentOrSelf(self.parentElement, 'details');
 
                 if (parent) {
-                    // focus parent
                     const nextFocus = parent.querySelector(':scope > summary');
                     nextFocus.focus();
 
@@ -2586,7 +2496,6 @@
         }
 
         async edit(event, activeElement) {
-            log('edit',{event, activeElement});
             const summary = activeElement;
 
             const isSummary = this.isElementTag(summary, 'summary');
@@ -2610,12 +2519,13 @@
         }
 
         async deleteArbor(event, activeElement) {
-            log('deleteArbor',{event, activeElement});
             const details = activeElement?.parentElement;
             const li = details?.parentElement;
             const nextFocus = this.getPreviousSiblingOrParent(li);
             const parentDetails = this.getTagParentOrSelf(details.parentElement, 'details');
             const id = details?.arbor;
+
+// TODO: WE NEED TO RECURSIVE DELETE ALL CHILDREN
 
             if (id) {
                 await this.delete(id);
@@ -2628,13 +2538,10 @@
 
         async toggle(event, activeElement) {
             const details = activeElement.parentElement;
-            log('toggle',{this:this,event, details, activeElement});
-
             
             const isAllowedHandler = await this.isDropDownAllowedHandler(event, activeElement);
 
             if (!isAllowedHandler) {
-                log('NO toggle',{isArrowHandler});
                 return;
             }
 
@@ -2646,7 +2553,6 @@
         }
 
         async clickHandler(event, activeElement) {
-            log('clickHandler',{this:this,event, activeElement});
             const isCopyButton = activeElement.matches('strong');
             const isBody = activeElement.matches('body');
 
@@ -2657,8 +2563,6 @@
             }
 
             if (isBody) {
-                // existe input sendo editado?
-                // this.focus(document.querySelector('summary > input'));
                 return;
             }
 
@@ -2673,156 +2577,107 @@
 
         async dragHandleDragStart(event, activeElement) {
             const details = event.target.parentElement;
-            log("dragHandleDragStart", {event, activeElement, details});
             this.root.draggedItem = details;
             details.classList.add('dragging');
-            // Some browsers require data to be set for drag events.
             event.dataTransfer.setData('text/plain', details.arbor);
-            // Optionally, you could set a custom drag image.
         }
 
         async dragHandleDragOver(event, activeElement) {
-                event.preventDefault(); // Allow dropping.
+            event.preventDefault(); // Allow dropping.
 
-                if (activeElement.matches('arbor-root,ol,li')) return;
-                
-                //                        details
-                const details = this.getNearestParentOrChildTag(activeElement, 'details');
-            log("dragHandleDragOver", {event, activeElement, details});
-                //                      li
-                const li = details.parentElement;
-                //                   ol
-                const list = li.parentElement;
+            if (activeElement.matches('arbor-root,ol,li')) return;
+            
+            //                        details
+            const details = this.getNearestParentOrChildTag(activeElement, 'details');
+            //                      li
+            const li = details.parentElement;
+            //                   ol
+            const list = li.parentElement;
 
-                const isDetailsTheDraggedItem = details === this.root.draggedItem; // Ignore the item being dragged.
-                const isValidDrag = !isDetailsTheDraggedItem;
+            const isDetailsTheDraggedItem = details === this.root.draggedItem; // Ignore the item being dragged.
+            const isValidDrag = !isDetailsTheDraggedItem;
 
-                log("----", { isDetailsTheDraggedItem, details, li, list });
-
-                if (!isValidDrag) return;
-                const rect = li.getBoundingClientRect();
-                const offset = event.clientY - rect.top;
-                const insertBefore = offset < rect.height / 2;
-            log("dragHandleDragOver 22222", {insertBefore});
-                if (insertBefore) {
-            log("dragHandleDragOver 33333", {insertBefore});
-                    if (li.previousSibling !== this.root.dropTarget) {
-            log("dragHandleDragOver 44444", {insertBefore});
-                        log(".insertBefore(", { list, dropTarget: this.root.dropTarget, li });
-                        li.before(this.root.dropTarget);
-                    }
-                } else {
-            log("dragHandleDragOver 55555", {insertBefore});
-                    if (li.nextSibling !== this.root.dropTarget) {
-            log("dragHandleDragOver 66666", {insertBefore});
-                        log(".insertBefore( nextSibling", { list, dropTarget: this.root.dropTarget, nextSibling: li.nextSibling });
-                        li.after(this.root.dropTarget);
-                    }
+            if (!isValidDrag) return;
+            const rect = li.getBoundingClientRect();
+            const offset = event.clientY - rect.top;
+            const insertBefore = offset < rect.height / 2;
+            if (insertBefore) {
+                if (li.previousSibling !== this.root.dropTarget) {
+                    li.before(this.root.dropTarget);
                 }
-            log("dragHandleDragOver 77777", {insertBefore});
+            } else {
+                if (li.nextSibling !== this.root.dropTarget) {
+                    li.after(this.root.dropTarget);
+                }
+            }
         }
 
         async dragHandleDragEnd(event, activeElement) {
 
-                const details = this.getTagParentOrSelf(activeElement, 'details');
-                const { arbor: id } = details;
+            const details = this.getTagParentOrSelf(activeElement, 'details');
+            const { arbor: id } = details;
 
-                const item = await this.get(id);
+            const item = await this.get(id);
 
-                let parent;
-                if (item.parent !== 'root') {
-                    parent = await this.get(item.parent);
-                }
+            let parent;
+            if (item.parent !== 'root') {
+                parent = await this.get(item.parent);
+            }
 
-            log("dragHandleDragEnd", {event, activeElement,details});
-                //                   span        summary
-                const summary = details.querySelector(':scope > summary');
-                log(">>>>> dragHandleDragEnd", {summary});
-                log(">>>>> dragHandleDragEnd antes CONTAINS(tem que ser TRUE):", summary.classList.contains('dragging'));
-                summary.classList.remove('dragging');
-                log(">>>>> dragHandleDragEnd depois CONTAINS (tem que ser FALSE):", summary.classList.contains('dragging'));
-                //                      summary      details         li
-                const li = this.root.draggedItem.parentElement.parentElement;
+            //                   span        summary
+            const summary = details.querySelector(':scope > summary');
+            summary.classList.remove('dragging');
+            //                      summary      details         li
+            const li = this.root.draggedItem.parentElement.parentElement;
+            const oldParent = details.parentElement.parentElement; // ol
+            const newParent = this.root.dropTarget.parentElement; // ol
+            const isSameParent = oldParent === newParent;
 
-                // here, persist order
-                // OLD POSITION PARENT UPDATE
-                // NEW POSITION PARENT UPDATE
-                // - get list
-                // - put order
-                // 
+            if (!newParent || !oldParent) {
+                throw new Error("Can't find drop position. NO NEW PARENT FOUND", this.root.dropTarget, {oldParent, newParent});
+            }
 
-                const oldParent = details.parentElement.parentElement; // ol
-                const newParent = this.root.dropTarget.parentElement; // ol
-                const isSameParent = oldParent === newParent;
+            this.root.dropTarget.before(li);
+            this.root.draggedItem = null;
+            this.root.dropTarget.remove();
 
-                if (!newParent || !oldParent) {
-                    throw new Error("Can't find drop position. NO NEW PARENT FOUND", this.root.dropTarget, {oldParent, newParent});
-                }
+            const newOrder = [
+                ...newParent.querySelectorAll(':scope > li')
+            ].map(x => {
+                return x.querySelector(':scope > details').arbor
+            });
 
-                this.root.dropTarget.before(li);
-                this.root.draggedItem = null;
+            const newParentDetails = this.getTagParentOrSelf(newParent, 'details');
+            const newParentId = newParentDetails?.arbor || 'root';
 
-                // precisa atualizar os pais
+            for (let i = 0; i < newOrder.length; i++) {
+                const id = newOrder[i];
+                const arbor = await this.get(id);
+                arbor.order = i + 1;
+                arbor.parent = newParentId;
+                await this.put(arbor);
+            }
 
-                // precisa reordenar no db
-                // o index por created não rola sozinho
-                this.root.dropTarget.remove();
+            if (isSameParent) {
+                return;
+            }
 
-                // log("oldPosition", {oldPositionDetails,oldPositionId});
-                // log("newPosition", {newPositionDetails,newPositionId});
-                log("newParent", newParent);
+            const oldOrder = [
+                ...oldParent.querySelectorAll(':scope > li')
+            ].map(x => {
+                return x.querySelector(':scope > details').arbor
+            });
 
-                const newOrder = [
-                    ...newParent.querySelectorAll(':scope > li')
-                ].map(x => {
-                    // log("NEW ORDER", {li: x});
-                    return x.querySelector(':scope > details').arbor
-                });
-
-                log("newOrder", newOrder);
-
-                const newParentDetails = this.getTagParentOrSelf(newParent, 'details');
-                const newParentId = newParentDetails?.arbor || 'root';
-
-                log("parent", { newParentDetails, newParentId });
-
-                for (let i = 0; i < newOrder.length; i++) {
-                    const id = newOrder[i];
-                    const arbor = await this.get(id);
-                    arbor.order = i + 1;
-                    arbor.parent = newParentId;
-                    await this.put(arbor);
-                }
-
-                if (isSameParent) {
-                    log("isSameParent", isSameParent);
-                    return;
-                }
-
-                // UPDATE NEW POSITION
-                log("oldParent", oldParent);
-
-                const oldOrder = [
-                    ...oldParent.querySelectorAll(':scope > li')
-                ].map(x => {
-                    // log("old ORDER", {li: x});
-                    return x.querySelector(':scope > details').arbor
-                });
-
-                log("oldOrder", oldOrder);
-
-                const oldParentDetails = this.getTagParentOrSelf(oldParent, 'details');
-                const oldParentId = oldParentDetails?.arbor || 'root';
-                
-                log("parent", { oldParentDetails, oldParentId });
-
-                for (let i = 0; i < oldOrder.length; i++) {
-                    const id = oldOrder[i];
-                    const arbor = await this.get(id);
-                    arbor.order = i + 1;
-                    arbor.parent = oldParentId;
-                    await this.put(arbor);
-                }
+            const oldParentDetails = this.getTagParentOrSelf(oldParent, 'details');
+            const oldParentId = oldParentDetails?.arbor || 'root';
+            
+            for (let i = 0; i < oldOrder.length; i++) {
+                const id = oldOrder[i];
+                const arbor = await this.get(id);
+                arbor.order = i + 1;
+                arbor.parent = oldParentId;
+                await this.put(arbor);
+            }
         }
 
         async dragHandleDrop(event, activeElement) {
@@ -2870,17 +2725,10 @@
                     const isLoaded = details.querySelector(':scope > arbor-root');
 
                     if (!isLoaded) {
-                        // there's items to show, but it's not loaded
-                        // so load the root NOT PRISTINE
-
                         const childrenElement = this.create('arbor-root');
                         childrenElement.id = parentId;
 
                         details.appendChild(childrenElement);
-                    } else {
-                        // there are items to show, and it is already loaded
-                        // so just open (do nothing here)
-
                     }
 
                     details.open = true;
@@ -2911,9 +2759,6 @@
                     await this.put(arbor);
 
                 } else {
-                    // must select parent
-                    // must focus the parent
-
                     //                                  li             ol          root          details
                     const parentDetails = details?.parentElement?.parentElement?.parentElement?.parentElement;
                     const isValidDetails = (
@@ -2923,14 +2768,11 @@
                     );
 
                     if (isValidDetails) {
-                        // parent exists, focus it
                         //                          li
                         let cursor = parentDetails.parentElement;
                         cursor = cursor.querySelector(":scope > details > summary");
                         this.focus(cursor);
 
-                    } else {
-                        // parent don't exist, does nothing
                     }
                 }
             }
@@ -2941,7 +2783,6 @@
             const item = await this.get(details.arbor);
             const { children = [] } = item;
             const checkbox = activeElement.querySelector('.checkpoint-box');
-            log('toggleChecked',{this:this,event,checkbox,activeElement});
             const isChecked = checkbox.textContent === '✔️';
             const isReady = checkbox.textContent === '';
 
@@ -2985,8 +2826,6 @@
             { start: 0x1FA70, end: 0x1FAFF }  // Additional recent emojis
           ];
 
-          // First, calculate the total count of emojis from our ranges,
-          // and store cumulative counts to later determine which range an index falls into.
           let totalCount = 0;
           const cumulativeCounts = [];
           for (const range of emojiRanges) {
@@ -2998,23 +2837,19 @@
           // Add one for the pirate flag option.
           const totalOptions = totalCount + 1; // 1824 + 1 = 1825
 
-          // Pick a random index between 0 and totalOptions - 1.
           const randIndex = Math.floor(Math.random() * totalOptions);
 
-          // If the index equals totalCount (i.e. the last option), return the pirate flag.
           if (randIndex === totalCount) {
             // Pirate flag emoji represented as BLACK FLAG + ZWJ + SKULL AND CROSSBONES (with variation selector)
             return "\u{1F3F4}\u200D\u2620\uFE0F";
           }
           
-          // Otherwise, determine in which range the randIndex falls.
           let rangeIndex = 0;
           for (const cumulative of cumulativeCounts) {
             if (randIndex < cumulative) break;
             rangeIndex++;
           }
           
-          // Calculate the offset within the chosen range.
           const previousCumulative = rangeIndex === 0 ? 0 : cumulativeCounts[rangeIndex - 1];
           const offset = randIndex - previousCumulative;
           const codePoint = emojiRanges[rangeIndex].start + offset;
@@ -3110,6 +2945,19 @@
 
             return result?.choices?.[0]?.message?.content;
         }
+
+        handlePaste(event) {
+            event.preventDefault();
+            let incomingData = '';
+            for (const type of event.clipboardData.types) {
+              incomingData += event.clipboardData.getData(type);
+              log({type, l:incomingData.length, incomingData});
+            }
+            const lines = incomingData.split(/\r\n|\n|\r/);
+            const result = lines.map(x => x.trim()).filter(Boolean);
+
+            return result;
+        }
     }
 
     customElements.define('arbor-root', ArborRoot);
@@ -3172,18 +3020,13 @@
         root.css(ARBOR_STYLES);
         root.shortcuts(ARBOR_SHORTCUTS);
         root.onRecursiveRender(async () => {
-            log("init onRecursiveRender scroll to", +localStorage.scrollPosition);
             scrollTo(0, +localStorage.scrollPosition);
             const { lastFocusId } = localStorage;
-            log("init onRecursiveRender lastFocusId", lastFocusId);
             if (lastFocusId) {
                 const found = await root.findRenderedArborElement(lastFocusId);
 
                 if (found) {
-                    log('FOUND lastFocusId: ', found);
                     root.focus(found);
-                } else {
-                    log('Could not focus lastFocusId: ', lastFocusId, found);
                 }
             }
         });
