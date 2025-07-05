@@ -470,8 +470,51 @@
             border-radius: 5px;
         }
 
+        .present-frame {
+            position: absolute;
+            top: 10%;
+            left: 5%;
+            right: 5%;
+            bottom: 10%;
+        }
+
+        .present-frame iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 5px;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        dialog {
+            width: 90vw;
+            height: 80vh;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        dialog::backdrop {
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes fadeScaleIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to   { opacity: 1; transform: scale(1);   }
+        }
+
+        dialog[open] {
+            animation: fadeScaleIn 200ms ease-out;
+        }
+
         .glow {
-          animation: glowAnimation .5s forwards;
+            animation: glowAnimation .5s forwards;
         }
 
         @keyframes glowAnimation {
@@ -839,6 +882,9 @@
                 const logo = this.create('h1');
                 const logoAnchor = this.create('a');
                 const menu = this.create('div');
+                const circlePackButton = this.create('button');
+                const tidyTreeButton = this.create('button');
+                const clusterTreeButton = this.create('button');
                 const importButton = this.create('button');
                 const exportButton = this.create('button');
                 const themeButton = this.create('button');
@@ -849,6 +895,9 @@
                     colorPicker.value = previousThemeColor;
                 }
 
+                const circlePackLabel = '🫧   Circle Pack';
+                const tidyTreeLabel = '🌿   Tidy Tree';
+                const clusterTreeLabel = '🍇   Cluster Tree';
                 const themeTree = '🌳   Theme';
                 const themeLight = '🌞   Theme';
                 const themeDark = '🌚   Theme';
@@ -890,13 +939,19 @@
                 colorPicker.oninput = e => {
                     const { value } = e.target;
                     this.changeBaseColor(value);
-                    log("COLOR:", value);
                 };
                 
+                circlePackButton.onclick = e => this.circlePack();
+                tidyTreeButton.onclick = e => this.tidyTree();
+                clusterTreeButton.onclick = e => this.clusterTree();
                 importButton.onclick = e => this.import();
                 exportButton.onclick = e => this.export();
                 themeButton.onclick = e => this.changeTheme(themeButton);
 
+
+                circlePackButton.textContent = circlePackLabel;
+                tidyTreeButton.textContent = tidyTreeLabel;
+                clusterTreeButton.textContent = clusterTreeLabel;
                 importButton.textContent = '📥   Import';
                 importButton.title = 'Import JSON file...';
                 exportButton.textContent = '📤   Export';
@@ -907,6 +962,9 @@
                 logo.appendChild(logoAnchor);
                 
                 menu.classList.add('menu');
+                menu.appendChild(circlePackButton);
+                menu.appendChild(tidyTreeButton);
+                menu.appendChild(clusterTreeButton);
                 menu.appendChild(importButton);
                 menu.appendChild(exportButton);
                 menu.appendChild(themeButton);
@@ -916,6 +974,75 @@
                 root.before(header);
             }
         }
+
+        arborToFlare(flat, rootName = 'arbor') {
+          const byId = {};
+          for (const item of flat) {
+            const node = { name: item.value };
+            const hasKids = item.children && item.children.length > 0;
+            if (!hasKids && typeof item.weight === 'number') node.value = item.weight;
+            node.children = [];
+            byId[item.id] = node;
+          }
+
+          const root = { name: rootName, children: [] };
+          for (const item of flat) {
+            const node      = byId[item.id];
+            const parentId  = item.parent;
+
+            if (!parentId || parentId === 'root') {
+              root.children.push(node);
+            } else {
+              const parentNode = byId[parentId];
+              if (parentNode) parentNode.children.push(node);
+              else root.children.push(node);
+            }
+          }
+
+          (function prune(n) {
+            for (const child of n.children) prune(child);
+            if (n.children.length === 0) delete n.children;
+          })(root);
+
+          return root;
+        }
+
+        presentModal(src) {
+            const presentFrame = this.create('dialog');
+            presentFrame.classList.add('present-frame');
+            document.body.appendChild(presentFrame);
+            const iframe = this.create('iframe');
+            iframe.src = src;
+            presentFrame.appendChild(iframe);
+            presentFrame.onclick = event => {
+                presentFrame.close();
+            };
+            iframe.addEventListener('load', async () => {
+                const data = this.arborToFlare(await this.getAllDBItems());
+                iframe.contentWindow.postMessage(
+                    { type: 'arbor:data', payload: data },
+                    location.origin
+                );
+            });
+
+            return presentFrame;
+        }
+
+        circlePack() {
+            const frame = this.presentModal('circle-pack.html');
+            frame.showModal();
+        }
+
+        tidyTree() {
+            const frame = this.presentModal('tidy-tree.html');
+            frame.showModal();
+        }
+
+        clusterTree() {
+            const frame = this.presentModal('cluster-tree.html');
+            frame.showModal();
+        }
+
 
         changeBaseColor(rgb) {
             const { h, s, l } = this.hexToHSL(rgb);

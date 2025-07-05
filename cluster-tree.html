@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cluster Tree Full Screen</title>
+  <title>Cluster Tree</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <style>
     html, body {
@@ -11,7 +11,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      font-family: sans-serif;
       background: #f3f4f6;
     }
     text {
@@ -28,21 +28,24 @@
 <body>
   <div id="chart"></div>
   <script type="module">
-    const DATA_URL = "flare.json"; // hierarchical data path
+    const dx = 25; // vertical separation between nodes (px)
 
-    const dx = 14; // vertical separation between nodes (px)
+    window.addEventListener('message', onData);
 
-    // Kick‑off
-    draw();
+    function onData(evt) {
+      const { type, payload } = evt.data ?? {};
+      if (type !== 'arbor:data' || !payload) return;   // ignore noise
 
-    // Re-render on resize
+      draw(payload);
+    }
+
     window.addEventListener("resize", () => {
       if (window.__treeData) draw(window.__treeData);
     }, { passive: true });
 
     async function draw(cachedData) {
       try {
-        const data = cachedData || await fetch(DATA_URL).then(r => r.json());
+        const data = cachedData;
         window.__treeData = data; // cache for future draws
 
         const container = document.getElementById("chart");
