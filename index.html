@@ -1261,7 +1261,13 @@
 
             if (parent === 'root' || !details) return;
 
-            const nextParent = await this.get(parent);
+            let nextParent;
+            try {
+                nextParent = await this.get(parent);
+
+            } catch(err) {
+                return;
+            }
             const nextParentElement = await this.getTagParentOrSelf(details.parentElement, 'details');
 
             if (nextParent && nextParentElement) {
